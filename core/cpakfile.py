@@ -1,6 +1,7 @@
 import dataclasses
 import enum
 import pathlib
+import re
 import typing
 import yaml
 
@@ -198,6 +199,11 @@ class BuildInfo(yaml.YAMLObject):
         if (temp := _validate_list(self.targets, BuildTarget)) is None:
             raise ValueError("Targets cannot be None")
         self.targets = temp
+        
+        # HACK: this is an issue that should be resolved in the interpolator.
+        if self.threads != None and isinstance(self.threads, str):
+            self.threads = int(self.threads)
+
         self.includes = _validate_list(self.includes, pathlib.Path)
         self.libraries = _validate_list(self.libraries, pathlib.Path)
 
@@ -339,25 +345,29 @@ class CPakfile(yaml.YAMLObject):
     project: SerializableData[Project]
     build:   SerializableData[BuildInfo]
 
+    parent:     typing.Optional['CPakfile'] = dataclasses.field(default_factory=lambda: None, init=False)
     parentref:  typing.Optional[SerializableData[ParentReference]] = None
     management: typing.Optional[SerializableData[Management]] = None
     export:     typing.Optional[SerializableData[ExportInfo]] = None
     profiles:   typing.Optional[SerializableList[Profile]] = None
-    properties: typing.Optional[SerializableData[dict]] = None
+    properties: dict = dataclasses.field(default_factory=lambda: {})
+    
 
     def __post_init__(self) -> None:
         # Validate the parent reference and attempt to load the parents.
         if (temp := _validate_object(self.parentref, ParentReference)) is not None:
             assert isinstance(temp, ParentReference), \
                 "ParentReference was not deserialized properly."
-            setattr(self, "parent", load_parent_cpakfile(temp))
-            self.parentref = temp
+            self.parentref  = temp
+            self.parent     = load_parent_cpakfile(temp)
+            self.properties.update(self.parent.properties)
+            self.properties.update({ "parent": self.__parent_properties() })
 
-        # TODO: Interpolate properties
         if (temp := _validate_object(self.project, Project)) is None:
             raise ValueError("Project cannot be None")
         self.project = temp
 
+        self.__interpolate_properties()
         if (temp := _validate_object(self.build, BuildInfo)) is None:
             raise ValueError("BuildInfo cannot be None")
         self.build = temp
@@ -366,12 +376,27 @@ class CPakfile(yaml.YAMLObject):
         self.export     = _validate_object(self.export, ExportInfo)
         self.profiles   = _validate_list(self.profiles, Profile)
 
+        
     @classmethod
     def from_yaml(cls, loader, node) -> 'CPakfile':
         return cls(**loader.construct_mapping(node, deep=True))
 
+    
+    def __parent_properties(self) -> dict:
+        exclude = ["properties"]
+        keys    = self.parent.__dict__.keys()
+        return { k: self.parent.__dict__[k] for k in keys - exclude }
+
+        
+    def __interpolate_properties(self) -> None:
+        PropertiesInterpolator.properties(self.properties)
+        PropertiesInterpolator.interpolate(self.build)      # type: ignore
+        PropertiesInterpolator.interpolate(self.management) # type: ignore
+        PropertiesInterpolator.interpolate(self.export)     # type: ignore
+        PropertiesInterpolator.interpolate(self.profiles)   # type: ignore
 
 
+                
 def load_parent_cpakfile(parentref: ParentReference) -> CPakfile:
     path = find_parent_config(parentref)
     with path.open() as source:

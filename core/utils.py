@@ -1,11 +1,9 @@
 import pathlib
 import re
 import typing
+import types
 
 from .typedefs import NullableData, NullableList, T
-
-if typing.TYPE_CHECKING:
-    from cpakfile import *
 
 
 CPAKFILES = ["CPakfile", "CPakfile.yml", "CPakfile.yaml"]
@@ -22,35 +20,50 @@ def build_local_repo_path(name: str) -> pathlib.Path:
 @typing.final
 class PropertiesInterpolator:
     __properties: dict
-    __expression: re.Pattern = re.compile(".*{.*}.*")
+    __expression: re.Pattern = re.compile(".*{.*}.*", re.DOTALL)
 
     @classmethod
     def properties(cls, props: dict) -> None:
         cls.__properties = props
 
+        
     @classmethod
     def interpolate(cls, data: dict) -> None:
-        for key in data:
-            to_process = data[key]
-            if isinstance(to_process, dict):
-                cls.interpolate(to_process)
-            elif isinstance(to_process, list):
-                for item in to_process:
-                    cls.interpolate(item)
-            elif isinstance(to_process, str):
-                cls.__try_interpolate_string(to_process, data)
-            else:
-                raise TypeError(to_process)
+        cls.__try_interpolate(data)
+
 
     @classmethod
-    def __try_interpolate_string(cls, value: str, data: dict) -> bool:
-        if value == None:
-            return True
+    def __try_interpolate(cls, data):
+        if isinstance(data, int):
+            return int(data)
+        if isinstance(data, dict):
+            return cls.__try_interpolate_dict(data)    
+        elif isinstance(data, list):
+            return cls.__try_interpolate_list(data)
+        elif isinstance(data, str):
+            return cls.__try_interpolate_string(data)
 
+            
+    @classmethod
+    def __try_interpolate_dict(cls, value: dict) -> dict:
+        for key in value:
+            value[key] = cls.__try_interpolate(value[key])
+        return value
+
+                
+    @classmethod
+    def __try_interpolate_list(cls, value: list) -> list:
+        for idx in range(len(value)):
+            value[idx] = cls.__try_interpolate(value[idx])
+        return value
+
+    
+    @classmethod
+    def __try_interpolate_string(cls, value: str) -> str:
         # Needs to be able to load from hierarchy of the data.
         while cls.__expression.match(value) is not None:
-            value = value.format(**data) # type: ignore
-        return True
+            value = value.format(**cls.__properties) # type: ignore
+        return value
 
 
 
