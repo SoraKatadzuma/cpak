@@ -329,12 +329,6 @@ def load_config(cfgdir: pathlib.Path) -> dict:
     raise FileNotFoundError(f"No CPakfile at {cfgdir}")
 
 
-def _load_parent_cpakfile(parentref: ParentReference) -> 'CPakfile':
-    path = find_parent_config(parentref)
-    with path.open() as source:
-        return yaml.safe_load(source)
-
-
 
 @typing.final
 @dataclasses.dataclass
@@ -356,7 +350,7 @@ class CPakfile(yaml.YAMLObject):
         if (temp := _validate_object(self.parentref, ParentReference)) is not None:
             assert isinstance(temp, ParentReference), \
                 "ParentReference was not deserialized properly."
-            setattr(self, "parent", _load_parent_cpakfile(temp))
+            setattr(self, "parent", load_parent_cpakfile(temp))
             self.parentref = temp
 
         # TODO: Interpolate properties
@@ -375,3 +369,10 @@ class CPakfile(yaml.YAMLObject):
     @classmethod
     def from_yaml(cls, loader, node) -> 'CPakfile':
         return cls(**loader.construct_mapping(node, deep=True))
+
+
+
+def load_parent_cpakfile(parentref: ParentReference) -> CPakfile:
+    path = find_parent_config(parentref)
+    with path.open() as source:
+        return yaml.safe_load(source)

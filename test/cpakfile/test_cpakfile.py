@@ -2,7 +2,7 @@ import unittest
 import unittest.mock
 import yaml
 
-from core.cpakfile    import CPakfile, _load_parent_cpakfile
+from core.cpakfile    import CPakfile
 from core.typedefs    import NullableData
 from .test_identity   import test_version_obj, test_version_str
 from .test_parent     import TestCPakfileParentDefinition, test_parent_prop
@@ -52,10 +52,10 @@ class TestCPakfileDefinition(unittest.TestCase):
 {test_export_info_prop}\
 """ 
     
-    test_yaml_NoProject = f"!CPakfile{test_build_info_prop}"
-    test_yaml_NoBuild   = f"!CPakfile{test_project_prop}"
+    test_yaml_NoProject = f"!CPakfile\n{test_build_info_prop}"
+    test_yaml_NoBuild   = f"!CPakfile\n{test_project_prop}"
 
-    @unittest.mock.patch('core.cpakfile._load_parent_cpakfile')
+    @unittest.mock.patch('core.cpakfile.load_parent_cpakfile')
     def test_load_positive(self, mock_load_parent_cpakfile):
         mapping: CPakfile = yaml.safe_load(self.test_yaml_Normal)
         TestCPakfileDefinition.validate(self, mapping)
@@ -66,7 +66,9 @@ class TestCPakfileDefinition(unittest.TestCase):
         TestCPakfileDefinition.validate_parented(self, yaml.safe_load(self.test_yaml_Parented))
 
     def test_load_negative(self):
-        pass
+        self.assertRaises(yaml.YAMLError, yaml.safe_load, self.test_yaml_Empty)
+        self.assertRaises(TypeError, yaml.safe_load, self.test_yaml_NoProject)
+        self.assertRaises(TypeError, yaml.safe_load, self.test_yaml_NoBuild)
 
     @staticmethod
     def validate(test: unittest.TestCase, cpf: NullableData[CPakfile]):
