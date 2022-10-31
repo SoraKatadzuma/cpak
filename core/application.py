@@ -5,13 +5,14 @@ import pathlib
 import typing
 import yaml
 
-from cpakfile           import NullableData
-from cpakfile.utilities import _validate_object
-from commands.build     import BuildCommand
+from application.arguments import parser
+from cpakfile              import *
+from cpakfile.utilities    import _validate_object
+from commands.build        import BuildCommand
+from commands.pull         import PullCommand
 
 from enum       import IntEnum, unique
 from .details   import LOGO_AND_VERSION
-from .arguments import parser
 from .logging   import logger
 
 
@@ -87,9 +88,19 @@ class Configuration(yaml.YAMLObject):
 class Application:
     def __init__(self) -> None:
         print("%s\n" % LOGO_AND_VERSION)
+        arguments = parser.parse_args()
+        if hasattr(arguments, "verbose"):
+            logger.setLevel(logging.DEBUG)
 
-        self.__verbose = False
         self.__config  = Configuration.load_config(DEFAULT_CONFIG_PATH)
+        match arguments.action:
+            case "build": self.__execute_build_action(arguments)
+            case "clean":
+                logger.info("Clean was requested")
+            case "config":
+                logger.info("Config was requested")
+            case "install":
+                logger.info("Install was requested")
 
 
     @property
@@ -102,22 +113,6 @@ class Application:
         return repo_path # type: ignore
 
 
-    def read_arguments(self) -> None:
-        arguments = parser.parse_args()
-        if hasattr(arguments, "verbose"):
-            self.__verbose = True
-            logger.setLevel(logging.DEBUG)
-
-        match arguments.action:
-            case "build": self.__execute_build_action(arguments)
-            case "clean":
-                logger.info("Clean was requested")
-            case "config":
-                logger.info("Config was requested")
-            case "install":
-                logger.info("Install was requested")
-
-
     def __execute_build_action(self, arguments: argparse.Namespace) -> None:
         cpakfile_path = pathlib.Path.cwd() / "CPakfile"
         if arguments.cpakfile is not None:
@@ -125,7 +120,24 @@ class Application:
 
         logger.debug(f"Loading CPakfile '{str(cpakfile_path)}'")
         with cpakfile_path.open("r", encoding="utf-8") as source:
-            BuildCommand.process(arguments, yaml.safe_load(source))
+            cpakfile: CPakfile = yaml.safe_load(source)
+            assert cpakfile.project is not None and \
+                   isinstance(cpakfile.project, Project), \
+                "cpakfile project is missing or still serialized."
+
+            assert cpakfile.management is not None and \
+                   isinstance(cpakfile.management, Management), \
+                "cpakfile management is missing or still serialized."
+
+            assert cpakfile.build is not None and \
+                   isinstance(cpakfile.build, BuildInfo), \
+                "cpakfile build info is missing or still serialized."
+
+            assert cpakfile.project.name is not None, \
+                "cpakfile project name is missing."
+
+            projname = cpakfile.project.name
+            BuildCommand.process(projname, arguments, cpakfile.management, cpakfile.build)
 
 
     def __execute_clean_action(self, arguments: argparse.Namespace) -> None:

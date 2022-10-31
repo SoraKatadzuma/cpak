@@ -1,30 +1,32 @@
 import argparse
+import cpakfile
 
-from cpakfile      import CPakfile, Project, Management
-from core.logging  import logger
-from .pull         import PullCommand
+from core.logging import logger
+from .pull        import PullCommand
 
 
 class BuildCommand:
     @classmethod
-    def process(cls, arguments: argparse.Namespace, cpakfile: CPakfile) -> None:
-        cls.__try_pull_command(arguments, cpakfile)
+    def process(cls,
+                projname: str,
+                arguments: argparse.Namespace,
+                management: cpakfile.Management,
+                build_info: cpakfile.BuildInfo) -> None:
+        assert isinstance(management.depends, list), \
+            "management.depends is not of type list."
+
+        assert isinstance(management.plugins, list), \
+            "management.plugins is not of type list."
+
+        assert isinstance(build_info.targets, list), \
+            "Build info targets is missing or still serialized."
+
+        # Pull deps and plugs if applicable.
+        PullCommand.process(projname, arguments, management)
+
+        # Start actual build sequence.
         logger.info(f"Initiated build for project '{cpakfile.project.name}'") # type: ignore
-
-
-    @classmethod
-    def __try_pull_command(cls, arguments: argparse.Namespace, cpakfile: CPakfile) -> None:
-        assert cpakfile.project is not None and \
-               isinstance(cpakfile.project, Project), \
-            "cpakfile project is missing or still serialized."
-
-        assert cpakfile.management is not None and \
-               isinstance(cpakfile.management, Management), \
-            "cpakfile management is missing or still serialized"
-
-        assert cpakfile.project.name is not None, \
-            "cpakfile project name is missing"
-
-        PullCommand.process(cpakfile.project.name, arguments, cpakfile.management)
+        # for target in build_info.targets:
+        #     cls.__build_target()
 
 

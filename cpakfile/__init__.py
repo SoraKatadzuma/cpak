@@ -12,6 +12,6 @@ from .parent       import ParentReference
 from .platform     import Platform
 from .plugin       import Plugin
 from .profile      import Profile
-from .project      import Project
+from .project      import Project, ProjectType
 from .remote       import Remote
 from .typedefs     import NullableData, NullableList, SerializableData, SerializableList, T

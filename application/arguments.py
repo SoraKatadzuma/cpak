@@ -170,7 +170,7 @@ init_parser.add_argument(
     "project",
     action  = "store",
     help    = """A string which defines the group ID, name, and version of the project. Should have
-the form 'gpid:name:semv'.""",
+the form 'gpid,name@semv'.""",
     metavar = "PROJECT",
     nargs   = 1,
     type    = str

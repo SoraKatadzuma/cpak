@@ -11,17 +11,13 @@ class PullCommand:
                 projname:   str,
                 arguments:  argparse.Namespace,
                 management: cpakfile.Management) -> None:
+        assert isinstance(management.depends, list), \
+            "management.depends is not of type list."
+
+        assert isinstance(management.plugins, list), \
+            "management.plugins is not of type list."
+
         logger.info(f"Initiated pull for project '{projname}'")
-
-        if management.depends is not None:
-            assert isinstance(management.depends, list), \
-                "management.depends is not of type list."
-        else: return
-
-        if management.plugins is not None:
-            assert isinstance(management.plugins, list), \
-                "management.plugins is not of type list."
-        else: return
 
         # Exclusive arguments provided.
         if hasattr(arguments, "deps_only"):
