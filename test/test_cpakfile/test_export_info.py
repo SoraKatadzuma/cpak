@@ -1,8 +1,7 @@
 import unittest
 import yaml
 
-from core.cpakfile      import ExportInfo
-from core.typedefs      import NullableData
+from cpakfile           import ExportInfo, NullableData
 from .test_build_target import test_path_obj, test_path_str
 
 

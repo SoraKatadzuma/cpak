@@ -1,8 +1,7 @@
 import unittest
 import yaml
 
-from core.cpakfile    import Identity
-from core.typedefs    import NullableData
+from cpakfile         import Identity, NullableData
 from semantic_version import Version
 
 # Test data for versions in the yaml.

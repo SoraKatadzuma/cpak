@@ -1,7 +1,7 @@
 import pathlib
 import re
 import typing
-import types
+import yaml
 
 from .typedefs import NullableData, NullableList, T
 
@@ -9,11 +9,17 @@ from .typedefs import NullableData, NullableList, T
 CPAKFILES = ["CPakfile", "CPakfile.yml", "CPakfile.yaml"]
 
 
-
-def build_local_repo_path(name: str) -> pathlib.Path:
-    # return cpakapp.config.repoloc / name
-    pass
-
+def load_config(cfgdir: pathlib.Path) -> dict:
+    ls = [x for x in cfgdir.iterdir()]
+    for file in CPAKFILES:
+        if file not in ls:
+            continue
+        config = cfgdir / file
+        if config.is_dir():
+            raise FileNotFoundError(f"CPakfile is directory {cfgdir}")
+        with config.open() as source:
+            return yaml.safe_load(source)
+    raise FileNotFoundError(f"No CPakfile at {cfgdir}")
 
 
 
@@ -26,7 +32,7 @@ class PropertiesInterpolator:
     def properties(cls, props: dict) -> None:
         cls.__properties = props
 
-        
+
     @classmethod
     def interpolate(cls, data: dict) -> None:
         cls.__try_interpolate(data)
@@ -37,27 +43,27 @@ class PropertiesInterpolator:
         if isinstance(data, int):
             return int(data)
         if isinstance(data, dict):
-            return cls.__try_interpolate_dict(data)    
+            return cls.__try_interpolate_dict(data)
         elif isinstance(data, list):
             return cls.__try_interpolate_list(data)
         elif isinstance(data, str):
             return cls.__try_interpolate_string(data)
 
-            
+
     @classmethod
     def __try_interpolate_dict(cls, value: dict) -> dict:
         for key in value:
             value[key] = cls.__try_interpolate(value[key])
         return value
 
-                
+
     @classmethod
     def __try_interpolate_list(cls, value: list) -> list:
         for idx in range(len(value)):
             value[idx] = cls.__try_interpolate(value[idx])
         return value
 
-    
+
     @classmethod
     def __try_interpolate_string(cls, value: str) -> str:
         # Needs to be able to load from hierarchy of the data.

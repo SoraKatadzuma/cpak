@@ -2,8 +2,7 @@ import textwrap
 import unittest
 import yaml
 
-from core.cpakfile    import Management
-from core.typedefs    import NullableData
+from cpakfile         import Management, NullableData
 from .test_dependency import TestCPakfileDependencyDefinition, test_dependency_item
 from .test_plugin     import TestCPakfilePluginDefinition, test_plugin_item
 

@@ -1,0 +1,35 @@
+!CPakfile
+project:
+  name: Test Project
+  gpid: com.Simular.cpak
+  semv: 1.0.0
+  authors:
+  - name: John Christman
+    email: somerandom@email.com
+
+properties:
+  cpak_version: 1.0.0
+
+management:
+  plugins:
+  - name: CPak
+    gpid: Simular::Tech
+    semv: 1.0.0-alpha
+    config:
+      custom: 1
+
+  depends:
+  - name: CPak
+    gpid: Simular::Tech
+    semv: "{cpak_version}"
+    remote:
+      address:  https://github.com/SoraKatadzuma/CPak.git
+
+build:
+  toolchain: gcc
+  targets:
+  - name: test_target
+    type: archive
+    toolchain: gcc
+    sources:
+    - ./some/file/at/path.txt

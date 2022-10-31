@@ -3,10 +3,9 @@ import unittest
 import unittest.mock
 import yaml
 
-from core.cpakfile      import CPakfile
-from core.typedefs      import NullableData
+from cpakfile           import CPakfile, NullableData
 from .test_build_info   import TestCPakfileBuildInfoDefinition, test_build_info_prop
-from .test_build_target import test_build_flags, test_build_target_name, test_build_target_type, test_path_str
+from .test_build_target import test_build_flags, test_build_target_name, test_build_target_type, test_build_target_toolchain, test_path_str
 from .test_export_info  import TestCPakfileExportInfoDefinition, test_export_info_prop
 from .test_identity     import test_identity_name, test_identity_gpid, test_version_str
 from .test_management   import TestCPakfileManagementDefinition, test_management_prop
@@ -23,13 +22,13 @@ properties:
     name: {test_identity_name}
     gpid: {test_identity_gpid}
     semv: {test_version_str}
-  
+
   dedicated_platform:
     type: {test_platform_type}
     dist: {test_platform_dist}
     arch: {test_platform_arch}
     semv: {test_version_str}
-  
+
   custom_github:
     repository: {test_remote_address}
     username:   {test_remote_username}
@@ -38,10 +37,11 @@ properties:
     branch:     {test_remote_branch}
 
   cpak_target:
-    name:    {test_build_target_name}
-    type:    {test_build_target_type}
-    flags:   {test_build_flags}
-    threads: 5
+    name:      {test_build_target_name}
+    type:      {test_build_target_type}
+    flags:     {test_build_flags}
+    threads:   5
+    toolchain: {test_build_target_toolchain}
 """
 
 # Custom interpolated identity.
@@ -68,8 +68,10 @@ test_interpolated_dependency_body = "%s\n%s" % \
 test_interpolated_dependency_item = "-%s" % test_interpolated_dependency_body[1:]
 
 # Custom interpolated plugin.
-test_interpolated_plugin_body = "%s\n%s" % \
-        (test_interpolated_identity_body[1:], test_plugin_conf)
+test_interpolated_plugin_body = "%s\n%s\n%s" % \
+        (test_interpolated_identity_body[1:],
+         test_plugin_conf,
+         textwrap.indent(test_interpolated_remote_prop, ' ' * 2))
 test_interpolated_plguin_item = "-%s\n" % test_interpolated_plugin_body
 
 # Custom interpolated management.
@@ -90,9 +92,10 @@ test_interpolated_platform_prop = "platform:\n%s" % \
 
 # Custom interpolated build target.
 test_interpolated_build_target_body = """\
-  name:  "{cpak_target[name]}"
-  type:  "{cpak_target[type]}"
-  flags: "{cpak_target[flags]}"
+  name:      "{cpak_target[name]}"
+  type:      "{cpak_target[type]}"
+  flags:     "{cpak_target[flags]}"
+  toolchain: "{cpak_target[toolchain]}"
   sources:
   - %s
   includes:
@@ -147,7 +150,7 @@ class TestCPakfileDefinition(unittest.TestCase):
 {test_build_info_prop}
 {test_export_info_prop}\
 """
-    
+
     # TODO: add interpolated test.
     test_yaml_Interpolated = f"""\
 !CPakfile
@@ -158,7 +161,7 @@ class TestCPakfileDefinition(unittest.TestCase):
 {test_interpolated_build_info_prop}
 {test_interpolated_export_info_prop}\
 """
-    
+
     # TODO: add parented test.
     test_yaml_Parented = f"""\
 !CPakfile
@@ -168,16 +171,16 @@ class TestCPakfileDefinition(unittest.TestCase):
 {test_management_prop}
 {test_build_info_prop}
 {test_export_info_prop}\
-""" 
-    
+"""
+
     test_yaml_NoProject = f"!CPakfile\n{test_build_info_prop}"
     test_yaml_NoBuild   = f"!CPakfile\n{test_project_prop}"
 
-    @unittest.mock.patch('core.cpakfile.load_parent_cpakfile')
+    @unittest.mock.patch('cpakfile.cpakfile.load_parent_cpakfile')
     def test_load_positive(self, mock_load_parent_cpakfile):
         TestCPakfileDefinition.validate(self, yaml.safe_load(self.test_yaml_Normal))
         TestCPakfileDefinition.validate(self, yaml.safe_load(self.test_yaml_Interpolated))
-        
+
         # Special case must mock function
         mock_load_parent_cpakfile.return_value = yaml.safe_load(self.test_yaml_Normal)
         TestCPakfileDefinition.validate_parented(self, yaml.safe_load(self.test_yaml_Parented))
@@ -198,7 +201,7 @@ class TestCPakfileDefinition(unittest.TestCase):
 
         test.assertIsNotNone(cpf.profiles)                            # type: ignore
         test.assertEqual(len(cpf.profiles), 1)                        # type: ignore
-        TestCPakfileProfileDefinition.validate(test, cpf.profiles[0]) # type: ignore 
+        TestCPakfileProfileDefinition.validate(test, cpf.profiles[0]) # type: ignore
 
 
     @staticmethod
@@ -211,4 +214,4 @@ class TestCPakfileDefinition(unittest.TestCase):
         test.assertIsNotNone(cpf.parent)                  # type: ignore
         TestCPakfileDefinition.validate(test, cpf.parent) # type: ignore
 
-        
+

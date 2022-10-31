@@ -1,8 +1,8 @@
 import unittest
 import yaml
 
-from core.cpakfile  import Plugin
-from core.typedefs  import NullableData
+from cpakfile       import Plugin, NullableData
+from .test_remote   import TestCPakfileRemoteDefinition, test_remote_prop
 from .test_identity import (
     test_identity_body,
     test_identity_gpid,
@@ -22,9 +22,9 @@ properties:
 # Test data for cpakfile.Plugin tests.
 test_plugin_conf = f"""\
   config:
-    {test_property_str}\
+    {test_property_str}
 """
-test_plugin_body = f"{test_identity_body}\n{test_plugin_conf}"
+test_plugin_body = f"{test_identity_body}\n{test_plugin_conf}\n{test_remote_prop}"
 test_plugin_item = f"-{test_plugin_body[1:]}"
 
 
@@ -52,9 +52,10 @@ class TestCPakfilePluginDefinition(unittest.TestCase):
         test.assertIsInstance(plgn, Plugin)
         test.assertIsNotNone(plgn.config) # type: ignore
 
-        test.assertEqual(plgn.name, test_identity_name)  # type: ignore
-        test.assertEqual(plgn.gpid, test_identity_gpid)  # type: ignore
-        test.assertEqual(plgn.semv, test_version_obj)    # type: ignore
-        test.assertEqual(plgn.config, test_property_obj) # type: ignore
+        test.assertEqual(plgn.name, test_identity_name)          # type: ignore
+        test.assertEqual(plgn.gpid, test_identity_gpid)          # type: ignore
+        test.assertEqual(plgn.semv, test_version_obj)            # type: ignore
+        test.assertEqual(plgn.config, test_property_obj)         # type: ignore
+        TestCPakfileRemoteDefinition.validate(test, plgn.remote) # type: ignore
 
 

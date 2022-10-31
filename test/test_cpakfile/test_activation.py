@@ -2,8 +2,7 @@ import textwrap
 import unittest
 import yaml
 
-from core.cpakfile  import Activation, ActivationMode
-from core.typedefs  import NullableData
+from cpakfile       import Activation, ActivationMode, NullableData
 from .test_platform import (
     TestCPakfilePlatformDefinition,
     test_platform_prop,

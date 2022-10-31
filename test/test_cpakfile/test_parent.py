@@ -2,8 +2,7 @@ import textwrap
 import unittest
 import yaml
 
-from core.cpakfile    import ParentReference
-from core.typedefs    import NullableData
+from cpakfile         import ParentReference, NullableData
 from .test_build_info import test_path_obj, test_path_str
 from .test_identity   import (
     TestCPakfileIdentityDefinition,
@@ -43,7 +42,7 @@ class TestCPakfileParentDefinition(unittest.TestCase):
     def validate(test: unittest.TestCase, prnt: NullableData[ParentReference]):
         test.assertIsInstance(prnt, ParentReference)
         TestCPakfileIdentityDefinition.validate(test, prnt)
-        
+
         test.assertIsNotNone(prnt.path)            # type: ignore
         test.assertEqual(prnt.path, test_path_obj) # type: ignore
 

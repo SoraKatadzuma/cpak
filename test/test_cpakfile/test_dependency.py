@@ -1,8 +1,7 @@
 import unittest
 import yaml
 
-from core.cpakfile  import Dependency
-from core.typedefs  import NullableData
+from cpakfile       import Dependency, NullableData
 from .test_remote   import TestCPakfileRemoteDefinition, test_remote_prop
 from .test_identity import (
     test_identity_body,

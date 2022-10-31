@@ -1,8 +1,7 @@
 import unittest
 import yaml
 
-from core.cpakfile import Author
-from core.typedefs import NullableData
+from cpakfile import Author, NullableData
 
 # Test data for cpakfile.Author tests.
 test_author_name  = "John Doe"
@@ -24,7 +23,7 @@ class TestCPakfileAuthorDefinition(unittest.TestCase):
     def test_load_positive(self):
         mapping: dict = yaml.safe_load(self.test_yaml_Normal)
         TestCPakfileAuthorDefinition.validate(self, mapping["author"])
-        
+
     def test_load_negative(self):
         self.assertRaises(yaml.YAMLError, yaml.safe_load, self.test_yaml_Empty)
         self.assertRaises(TypeError, yaml.safe_load, self.test_yaml_NoName)

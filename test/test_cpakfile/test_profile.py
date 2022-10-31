@@ -2,8 +2,7 @@ import textwrap
 import unittest
 import yaml
 
-from core.cpakfile    import Profile
-from core.typedefs    import NullableData
+from cpakfile         import Profile, NullableData
 from .test_activation import TestCPakfileActivationDefinition, test_activation_mode, test_activation_prop
 from .test_build_info import TestCPakfileBuildInfoDefinition, test_build_info_prop
 from .test_management import TestCPakfileManagementDefinition, test_management_prop

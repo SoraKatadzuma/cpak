@@ -2,8 +2,7 @@ import textwrap
 import unittest
 import yaml
 
-from core.cpakfile  import Project
-from core.typedefs  import NullableData
+from cpakfile       import Project, NullableData
 from .test_author   import TestCPakfileAuthorDefinition, test_author_item
 from .test_identity import (
     TestCPakfileIdentityDefinition,

@@ -2,8 +2,7 @@ import textwrap
 import unittest
 import yaml
 
-from core.cpakfile      import BuildInfo
-from core.typedefs      import NullableData
+from cpakfile           import BuildInfo, NullableData
 from .test_build_target import (
     TestCPakfileBuildTargetDefinition,
     test_build_flags,

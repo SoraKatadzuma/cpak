@@ -1,119 +1,145 @@
 import argparse
+import dataclasses
 import logging
-import platform
-import os
-import sys
+import pathlib
 import typing
 import yaml
 
-from pathlib import Path
+from cpakfile           import NullableData
+from cpakfile.utilities import _validate_object
+from commands.build     import BuildCommand
 
-from .cpakfile import CPakfile
+from enum       import IntEnum, unique
+from .details   import LOGO_AND_VERSION
+from .arguments import parser
+from .logging   import logger
 
 
-MAJOR = 1
-MINOR = 0
-PATCH = 0
-LOGO  = """
- ::::::::  :::::::::      :::     :::    :::
-:+:    :+: :+:    :+:   :+: :+:   :+:   :+:
-+:+        +:+    +:+  +:+   +:+  +:+  +:+
-+#+        +#++:++#+  +#++:++#++: +#++:++
-+#+        +#+        +#+     +#+ +#+  +#+
-#+#    #+# #+#        #+#     #+# #+#   #+#
- ########  ###        ###     ### ###    ###"""
 
-VERSION     = f"v{MAJOR}.{MINOR}.{PATCH}".rjust(45)
-DESCRIPTION = """
-Configuration as code build tool for C/C++ designed to
-make it easier to build your projects in every single way."""
+DEFAULT_CPAK_PATH = pathlib.Path.home() / ".cpak"
+DEFAULT_REPO_PATH = DEFAULT_CPAK_PATH / "repos"
+DEFAULT_CONFIG_PATH = DEFAULT_CPAK_PATH / "config.yaml"
 
-LOG_FORMAT  = "[%(asctime)s] %(name)s | %(levelname)s: %(message)s"
-TIME_FORMAT = "%H:%M:%S"
+
+
+@unique
+class SignalType(IntEnum):
+    BUILD = 0
+
+
+
+# TODO: Put into an function with other representers and execute before application load.
+# To make sure paths get dumped correctly.
+yaml.SafeDumper.add_multi_representer(
+    pathlib.Path,
+    lambda dumper, path:
+        dumper.represent_str(str(path))
+)
+
+
+@typing.final
+@dataclasses.dataclass
+class Configuration(yaml.YAMLObject):
+    yaml_tag    = "!CPakConfiguration"
+    yaml_loader = yaml.SafeLoader
+    yaml_dumper = yaml.SafeDumper
+
+    repoloc: NullableData[pathlib.Path] = DEFAULT_REPO_PATH
+
+    def __post_init__(self) -> None:
+        self.repoloc = _validate_object(self.repoloc, pathlib.Path)
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return cls(**loader.construct_mapping(node, deep=True))
+
+
+    @classmethod
+    def load_config(cls, cfgpath: pathlib.Path) -> 'Configuration':
+        if not cfgpath.exists():
+            return cls.build_config(cfgpath)
+
+        result: 'Configuration'
+        with cfgpath.open("r", encoding="utf-8") as source:
+            result = yaml.safe_load(source)
+            logger.debug(f"Loaded configuration '{str(cfgpath)}'")
+        return result
+
+
+    @classmethod
+    def write_config(cls, cfgpath: pathlib.Path, config: 'Configuration') -> None:
+        with cfgpath.open("w", encoding="utf-8") as file:
+            yaml.safe_dump(config, file, indent=2, default_flow_style=False)
+            logger.debug(f"Wrote configuration to file: {str(cfgpath)}")
+
+
+    @classmethod
+    def build_config(cls, cfgpath: pathlib.Path) -> 'Configuration':
+        default = Configuration(repoloc=DEFAULT_REPO_PATH)
+        cfgpath.parent.mkdir(parents=True, exist_ok=True)
+        logger.warning(f"No CPak configuration, creating default.")
+        cls.write_config(cfgpath, default)
+        return default
 
 
 
 @typing.final
 class Application:
     def __init__(self) -> None:
+        print("%s\n" % LOGO_AND_VERSION)
+
         self.__verbose = False
-        self.__prepare_logger()
-        self.__prepare_options()
-        self.__load_config()
-        print('\n'.join([LOGO,VERSION]) + "\n")
+        self.__config  = Configuration.load_config(DEFAULT_CONFIG_PATH)
+
 
     @property
-    def log(self) -> logging.Logger:
-        return self.__logger
+    def repository_path(self) -> pathlib.Path:
+        repo_path = pathlib.Path(DEFAULT_REPO_PATH)
+        if self.__config.repoloc is not None:
+            repo_path = self.__config.repoloc
 
-    @property
-    def config(self) -> CPakfile:
-        return self.__config
+        # Verifiably a path
+        return repo_path # type: ignore
+
 
     def read_arguments(self) -> None:
-        arguments = self.__base.parse_args()
+        arguments = parser.parse_args()
         if hasattr(arguments, "verbose"):
             self.__verbose = True
-            self.__logger.setLevel(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
 
-    def __load_config(self) -> None:
-        cfgdir = Path.home() / ".cpak/config.yaml"
-        if not cfgdir.exists():
-            self.__build_config(cfgdir)
-            self.__logger.warn("No user configuration found, created default.")
-
-        with cfgdir.open() as source:
-            self.__config = yaml.safe_load(source)
-
-    def __build_config(self, cfgdir: Path) -> None:
-        ...
-
-    def __prepare_logger(self) -> None:
-        self.__logger    = logging.getLogger("cpak")
-        self.__handler   = logging.StreamHandler(sys.stdout)
-        self.__formatter = logging.Formatter(LOG_FORMAT, TIME_FORMAT)
-        self.__handler.setFormatter(self.__formatter)
-        self.__logger.addHandler(self.__handler)
-        self.__logger.setLevel(logging.INFO)
-
-    def __prepare_options(self) -> None:
-        self.__base = argparse.ArgumentParser(
-            description     = DESCRIPTION,
-            formatter_class = argparse.RawTextHelpFormatter,
-            add_help        = False
-        )
-
-        self.__options = self.__base.add_argument_group(
-            title       = "Universal Options",
-            description = "Options that can be used by all commands."
-        )
-
-        self.__options.add_argument(
-            "-h",
-            "--help",
-            action = "help",
-            help   = "Prints this help message and exits."
-        )
-
-        self.__options.add_argument(
-            "-v",
-            "--verbose",
-            action = "store_true",
-            help   = "Provides more descriptive console output."
-        )
-
-        self.__parser = argparse.ArgumentParser(
-            parents  = [self.__base],
-            add_help = False
-        )
-
-        self.__commands = self.__base.add_subparsers(
-            title       = "CPak actions",
-            description = "Valid commands for executing CPak actions.",
-            dest        = "action",
-            required    = True,
-            metavar     = "<command>"
-        )
+        match arguments.action:
+            case "build": self.__execute_build_action(arguments)
+            case "clean":
+                logger.info("Clean was requested")
+            case "config":
+                logger.info("Config was requested")
+            case "install":
+                logger.info("Install was requested")
 
 
-cpakapp = Application()
+    def __execute_build_action(self, arguments: argparse.Namespace) -> None:
+        cpakfile_path = pathlib.Path.cwd() / "CPakfile"
+        if arguments.cpakfile is not None:
+            cpakfile_path = pathlib.Path(arguments.cpakfile)
+
+        logger.debug(f"Loading CPakfile '{str(cpakfile_path)}'")
+        with cpakfile_path.open("r", encoding="utf-8") as source:
+            BuildCommand.process(arguments, yaml.safe_load(source))
+
+
+    def __execute_clean_action(self, arguments: argparse.Namespace) -> None:
+        pass
+
+
+    def __execute_config_action(self, arguments: argparse.Namespace) -> None:
+        pass
+
+
+    def __execute_install_action(self, arguments: argparse.Namespace) -> None:
+        cpakfile_path = pathlib.Path.cwd() / "CPakfile"
+        if arguments.cpakfile is not None:
+            cpakfile_path = arguments.cpakfile
+
+
+

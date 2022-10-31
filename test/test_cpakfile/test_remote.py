@@ -2,8 +2,7 @@ import textwrap
 import unittest
 import yaml
 
-from core.cpakfile import Remote
-from core.typedefs import NullableData
+from cpakfile import Remote, NullableData
 
 
 # Test data for cpakfile.SourceControl tests.
@@ -28,9 +27,7 @@ test_remote_prop = f"""\
 class TestCPakfileRemoteDefinition(unittest.TestCase):
     test_yaml_Empty      = f"remote: !Remote"
     test_yaml_Normal     = f"remote: !Remote\n{test_remote_body}"
-    test_yaml_NoAddress  = f"remote: !Remote\n  username: {test_remote_username}\n  password: {test_remote_password}"
-    test_yaml_NoUsername = f"remote: !Remote\n  address: {test_remote_address}\n  password: {test_remote_password}"
-    test_yaml_NoPassword = f"remote: !Remote\n  address: {test_remote_address}\n  username: {test_remote_username}"
+    test_yaml_NoAddress  = f"remote: !Remote\n  username: {test_remote_username}"
 
     def test_load_positive(self):
         mapping: dict = yaml.safe_load(self.test_yaml_Normal)
@@ -39,8 +36,6 @@ class TestCPakfileRemoteDefinition(unittest.TestCase):
     def test_load_negative(self):
         self.assertRaises(yaml.YAMLError, yaml.safe_load, self.test_yaml_Empty)
         self.assertRaises(TypeError, yaml.safe_load, self.test_yaml_NoAddress)
-        self.assertRaises(TypeError, yaml.safe_load, self.test_yaml_NoUsername)
-        self.assertRaises(TypeError, yaml.safe_load, self.test_yaml_NoPassword)
 
     @staticmethod
     def validate(test: unittest.TestCase, vcsd: NullableData[Remote]):

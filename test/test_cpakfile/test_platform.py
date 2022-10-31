@@ -1,8 +1,7 @@
 import unittest
 import yaml
 
-from core.cpakfile  import Platform
-from core.typedefs  import NullableData
+from cpakfile       import Platform, NullableData
 from .test_identity import test_version_obj, test_version_str
 
 
