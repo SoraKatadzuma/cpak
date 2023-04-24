@@ -1,0 +1,15 @@
+[submodule "external/argparse"]
+	path = external/argparse
+	url = https://github.com/p-ranav/argparse
+[submodule "external/spdlog"]
+	path = external/spdlog
+	url = https://github.com/gabime/spdlog
+[submodule "external/yaml-cpp"]
+	path = external/yaml-cpp
+	url = https://github.com/jbeder/yaml-cpp
+[submodule "external/cpp-subprocess"]
+	path = external/cpp-subprocess
+	url = https://github.com/arun11299/cpp-subprocess
+[submodule "external/cpp-semver"]
+	path = external/cpp-semver
+	url = https://github.com/z4kn4fein/cpp-semver
