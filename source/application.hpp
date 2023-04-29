@@ -2,10 +2,10 @@
 #include <memory>
 #include <string_view>
 #include <system_error>
+#include "build.hpp"
+#include "project.hpp"
 #include "argparse/argparse.hpp"
 #include "semver/semver.hpp"
-#include "spdlog/spdlog.h"
-#include "utilities/noncopyable.hpp"
 
 namespace cpak {
 
@@ -53,6 +53,9 @@ private:
     std::shared_ptr<spdlog::logger> logger_;
     std::shared_ptr<argparse::ArgumentParser> program_;
     std::shared_ptr<argparse::ArgumentParser> buildcmd_;
+
+    std::shared_ptr<ProjectManager> projectMgr_;
+    std::shared_ptr<BuildManager> buildMgr_;
 };
 
 

@@ -1,7 +1,10 @@
+# Build the cpak executable.
 add_executable(
     cpak
     application.cpp
+    build.cpp
     entry.cpp
+    project.cpp
 )
 
 target_link_libraries(

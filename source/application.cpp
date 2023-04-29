@@ -1,6 +1,8 @@
 #include <sstream>
 #include "application.hpp"
+#include "spdlog/fmt/bundled/color.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
+#include "yaml-cpp/yaml.h"
 
 std::string cpak::Application::version() noexcept {
     return VERSION.str();
@@ -19,6 +21,8 @@ cpak::Application::Application()
     : logger_{ spdlog::stdout_color_mt("cpak") }
     , program_{std::make_shared<argparse::ArgumentParser>("cpak")}
     , buildcmd_{std::make_shared<argparse::ArgumentParser>("build")}
+    , projectMgr_{std::make_shared<ProjectManager>(logger_)}
+    , buildMgr_{std::make_shared<BuildManager>(logger_)}
 {
     initLogger();
     initProgram();
@@ -41,7 +45,27 @@ std::int32_t cpak::Application::run(int argc, char** argv) {
 
     std::error_code commandStatus{ EXIT_SUCCESS, std::generic_category() };
     if (program_->is_subcommand_used("build")) {
-        // TODO: Implement build command.
+        const auto& pathStr     = buildcmd_->get("path");
+        const auto& projectPath = std::filesystem::canonical(pathStr);
+        const auto& cpakfile    = projectMgr_->load(projectPath, commandStatus);
+        if (commandStatus.value() != EXIT_SUCCESS) {
+            logger_->error(fmt::format(
+                fmt::fg(fmt::terminal_color::bright_red),
+                "Failed to load project: {}", commandStatus.message()
+            ));
+            return EXIT_FAILURE;
+        }
+
+        buildMgr_->build(cpakfile, projectPath, commandStatus);
+        if (commandStatus.value() != EXIT_SUCCESS) {
+            logger_->error(fmt::format(
+                fmt::fg(fmt::terminal_color::bright_red),
+                "Failed to build project: {}", commandStatus.message()
+            ));
+            return EXIT_FAILURE;
+        }
+
+        return EXIT_SUCCESS;
     }
 
     return commandStatus.value();
