@@ -8,7 +8,7 @@ using namespace cpak;
 
 static std::uint32_t totalItemsToBuild = 0;
 static std::uint32_t sourceErrorCount  = 0;
-static std::uint32_t targetItemsBuilt  = 0;
+static std::uint32_t itemBuildProgress = 0;
 
 
 static inline std::string ltrim(std::string str) {
@@ -151,17 +151,23 @@ void BuildManager::buildTarget(const BuildTarget&           target,
         return;
     }
 
+    itemBuildProgress++;
     linkTarget(target, projectPath, buildStatus);
     if (buildStatus.value() != 0) {
         logger_->error("Failed to link target '{}'", target.name.c_str());
         return;
     }
 
+    // Log source file being built.
+    const auto& percentage = (float)itemBuildProgress /
+                             (float)totalItemsToBuild;
+
+    // Because the length of the 100% string is 13.
     logger_->info(
-        "{} Built target '{}'",
+        "{:<13} Built target '{}'",
         fmt::format(
             fmt::fg(fmt::terminal_color::bright_blue),
-            "{}\%", 100.0f
+            "{}\%", std::round(percentage * 100.0f)
         ),
         target.name.c_str()
     );
@@ -186,6 +192,7 @@ void BuildManager::buildSources(const BuildTarget&           target,
             std::filesystem::create_directories(outputPath);
 
         // Proceed to compile sources.
+        itemBuildProgress++;
         outputPath = outputPath / fmt::format("{}.o", sourceFile.filename().c_str());
         compileSource(arguments, sourcePath, outputPath);
     }
@@ -209,16 +216,16 @@ void BuildManager::compileSource(const std::vector<std::string>& arguments,
     finalArguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
 
     // Log source file being built.
-    const auto& percentage = (float)targetItemsBuilt /
+    const auto& percentage = (float)itemBuildProgress /
                              (float)totalItemsToBuild;
 
+    // Because the length of the 100% string is 13.
     logger_->info(
-        "{:<{}} Compiling source '{}'",
+        "{:<13} Compiling source '{}'",
         fmt::format(
             fmt::fg(fmt::terminal_color::bright_blue),
             "{}\%", std::round(percentage * 100.0f)
         ),
-        13, // Because the length of the 100% string is 13.
         sourcePath.c_str()
     );
 
@@ -230,14 +237,13 @@ void BuildManager::compileSource(const std::vector<std::string>& arguments,
 
     // Build the source file.
     const auto& result = executeInShell(finalArguments);
-    if (result.exitCode == 0) {
-        targetItemsBuilt++;
+    if (result.exitCode == 0)
         return;
-    }
 
     // Print what happened.
     sourceErrorCount++;
     logger_->error("\n{}", result.error);
+    logger_->error("\n{}", result.output);
 }
 
 void BuildManager::linkTarget(const BuildTarget&           target,
@@ -249,7 +255,8 @@ void BuildManager::linkTarget(const BuildTarget&           target,
     arguments.emplace_back("g++");
 
     // Add sources.
-    const auto& outputPath = projectPath / "build" / "objects";
+    const auto& buildPath  = projectPath / "build";
+    const auto& outputPath = buildPath / "objects";
     for (const auto& source : target.sources) {
         const auto& sourceFile = std::filesystem::path(source);
         const auto& sourcePath = outputPath / fmt::format("{}.o", sourceFile.filename().c_str());
@@ -257,43 +264,51 @@ void BuildManager::linkTarget(const BuildTarget&           target,
     }
 
     // Add library search directories.
+    arguments.emplace_back(fmt::format("-L {}", buildPath.c_str()));
     for (const auto& directory : target.search->library)
         arguments.emplace_back(fmt::format("-L {}", directory));
 
     // Add linking libraries.
-    arguments.emplace_back("-lstdc++");
     for (const auto& library : target.libraries)
         arguments.emplace_back(fmt::format("-l {}", library));
 
     // Add output type and output.
+    std::string targetName;
     std::string outputName;
-    const auto& executable = projectPath / "build" / target.name;
+    std::filesystem::path targetPath;
+    const auto& outputType = cpak::buildTypeName(target.type);
     switch (target.type) {
     case TargetType::Executable:
-        arguments.emplace_back(fmt::format("-o {}", executable.c_str()));
+        targetPath = buildPath / target.name;
+        arguments.emplace_back(fmt::format("-o {}", targetPath.c_str()));
         break;
     case TargetType::StaticLibrary:
-        arguments.emplace_back("-static");
-        arguments.emplace_back(fmt::format("-o {}.a", executable.c_str()));
+        targetName = fmt::format("lib{}.a", target.name);
+        targetPath = buildPath / targetName;
+        arguments.emplace_back("-r");
+        arguments.emplace_back(fmt::format("-o {}", targetPath.c_str()));
         break;
     case TargetType::DynamicLibrary:
+        targetName = fmt::format("lib{}.so", target.name);
+        targetPath = buildPath / targetName;
         arguments.emplace_back("-shared");
-        arguments.emplace_back(fmt::format("-o {}.so", executable.c_str()));
+        arguments.emplace_back(fmt::format("-o {}", targetPath.c_str()));
         break;
     }
 
     // Log source file being built.
-    const auto& percentage = (float)targetItemsBuilt /
+    const auto& percentage = (float)itemBuildProgress /
                              (float)totalItemsToBuild;
 
+    // Because the length of the 100% string is 13.
     logger_->info(
-        "{:<{}} Linking executable '{}'",
+        "{:<13} Linking {} '{}'",
         fmt::format(
             fmt::fg(fmt::terminal_color::bright_blue),
             "{}\%", std::round(percentage * 100.0f)
         ),
-        13, // Because the length of the 100% string is 13.
-        executable.c_str()
+        outputType.c_str(),
+        targetPath.c_str()
     );
 
     // Log the command.
@@ -304,11 +319,10 @@ void BuildManager::linkTarget(const BuildTarget&           target,
 
     // Build the source file.
     const auto& result = executeInShell(arguments);
-    if (result.exitCode == 0) {
-        targetItemsBuilt++;
+    if (result.exitCode == 0)
         return;
-    }
 
     // Print what happened.
     logger_->error("\n{}", result.error);
+    logger_->error("\n{}", result.output);
 }
