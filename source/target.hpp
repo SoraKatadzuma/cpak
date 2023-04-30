@@ -116,6 +116,8 @@ inline void validateTargetSchema(const YAML::Node& node) {
         throw YAML::Exception(node.Mark(), "Target is missing sources.");
     else if (!node["sources"].IsSequence())
         throw YAML::Exception(node.Mark(), "Target sources must be a sequence.");
+    else if (node["sources"].size() == 0)
+        throw YAML::Exception(node.Mark(), "Target sources must not be empty.");
 
     // Validate optional fields if present.
     if (node["options"] && !node["options"].IsScalar())

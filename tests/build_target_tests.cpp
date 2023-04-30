@@ -179,6 +179,25 @@ sources: >
     }
 }
 
+TEST(BuildTargetTests, cannotDecodeTargetNoSources) {
+    const auto& yamlStr = R"(
+name: simtech::base
+type: static_library
+options: >
+  -m64 -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
+  -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable
+  -Wno-unused-but-set-parameter -Wno-unused-result -Wno-missing-field-initializers
+sources: []
+)";
+
+    try {
+        const auto& yaml   = YAML::Load(yamlStr);
+        const auto& target = yaml.as<BuildTarget>();
+    } catch (const YAML::Exception& e) {
+        EXPECT_EQ(e.msg, "Target sources must not be empty.");
+    }
+}
+
 TEST(BuildTargetTests, cannotDecodeTargetNonScalarOptions) {
     const auto& yamlStr = R"(
 name: simtech::base
