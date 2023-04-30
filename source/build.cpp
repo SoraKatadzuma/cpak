@@ -53,31 +53,38 @@ cpak::BuildManager::getBuildArgumentsNoSources(const cpak::BuildTarget& target,
                                                      std::error_code&   buildStatus) const {
     using std::begin, std::end, std::make_error_code;
     std::vector<std::string> arguments;
-    arguments.reserve(
-        target.defines.size() +
-        target.search.include.size() +
-        target.search.library.size() +
-        target.search.system.size() +
-        target.libraries.size() +
-        2 // g++ and options
-    );
 
+    // Reserve enough space for all arguments.
+    auto size = target.defines.size() +
+                target.libraries.size() +
+                2; // g++ and options
+
+    if (target.search != std::nullopt) {
+        size += target.search->include.size();
+        size += target.search->library.size();
+        size += target.search->system.size();
+    }
+
+    arguments.reserve(size);
     arguments.emplace_back("g++");
 
     // Trim whitespaces from end of options if necessary.
-    arguments.emplace_back(rtrim(target.options));
+    if (target.options != std::nullopt)
+        arguments.emplace_back(rtrim(*target.options));
 
     // Add defines.
     for (const auto& define : target.defines)
         arguments.emplace_back(fmt::format("-D{}", define));
 
     // Add search paths.
-    for (const auto& includePath : target.search.include)
-        arguments.emplace_back(fmt::format("-I {}", includePath));
-    for (const auto& libraryPath : target.search.library)
-        arguments.emplace_back(fmt::format("-L {}", libraryPath));
-    for (const auto& systemPath : target.search.system)
-        arguments.emplace_back(fmt::format("-isystem {}", systemPath));
+    if (target.search != std::nullopt) {
+        for (const auto& includePath : target.search->include)
+            arguments.emplace_back(fmt::format("-I {}", includePath));
+        for (const auto& libraryPath : target.search->library)
+            arguments.emplace_back(fmt::format("-L {}", libraryPath));
+        for (const auto& systemPath : target.search->system)
+            arguments.emplace_back(fmt::format("-isystem {}", systemPath));
+    }
 
     // Add linking libraries.
     for (const auto& library : target.libraries)
