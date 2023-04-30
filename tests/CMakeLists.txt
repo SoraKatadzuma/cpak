@@ -10,12 +10,11 @@ macro(create_test TESTNAME TESTFILE)
         PRIVATE GTest::gtest_main
         PRIVATE yaml-cpp
     )
+
+    gtest_discover_tests(${TESTNAME})
 endmacro()
 
 # Create the tests.
 create_test(build_target build_target_tests.cpp)
+create_test(cpakfile     cpakfile_tests.cpp)
 
-# Discover all the tests.
-gtest_discover_tests(
-    build_target
-)

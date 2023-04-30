@@ -13,6 +13,21 @@ struct CPakFile {
 };
 
 
+/// @brief Validates the given CPakFile.
+/// @param node The node to validate.
+inline void validateCPakFileSchema(const YAML::Node& node) {
+    if (!node.IsMap())
+        throw YAML::Exception(node.Mark(), "CPakFile is not a map");
+    
+    if (!node["targets"])
+        throw YAML::Exception(node.Mark(), "CPakFile does not contain targets.");
+    else if (!node["targets"].IsSequence())
+        throw YAML::Exception(node.Mark(), "CPakFile targets is not a sequence.");
+    else if (node["targets"].size() == 0)
+        throw YAML::Exception(node.Mark(), "CPakFile targets is empty.");
+}
+
+
 }
 
 
@@ -27,9 +42,7 @@ struct YAML::convert<cpak::CPakFile> {
     }
 
     static bool decode(const Node& node, cpak::CPakFile& rhs) {
-        if (!node.IsMap())
-            return false;
-
+        cpak::validateCPakFileSchema(node);
         for (const auto& target : node["targets"])
             rhs.targets.push_back(target.as<cpak::BuildTarget>());
         
