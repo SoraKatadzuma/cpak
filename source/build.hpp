@@ -30,18 +30,6 @@ private:
                      const std::filesystem::path& projectPath,
                            std::error_code&       buildStatus) const;
 
-    void buildExecutable(const BuildTarget&           target,
-                         const std::filesystem::path& projectPath,
-                               std::error_code&       buildStatus) const;
-
-    void buildStaticLibrary(const BuildTarget&           target,
-                            const std::filesystem::path& projectPath,
-                                  std::error_code&       buildStatus) const;
-
-    void buildDynamicLibrary(const BuildTarget&           target,
-                             const std::filesystem::path& projectPath,
-                                   std::error_code&       buildStatus) const;
-
     void buildSources(const BuildTarget&           target,
                       const std::filesystem::path& projectPath,
                             std::error_code&       buildStatus) const;
@@ -50,17 +38,9 @@ private:
                        const std::filesystem::path&    sourcePath,
                        const std::filesystem::path&    outputPath) const;
 
-    void linkExecutable(const BuildTarget&           target,
-                        const std::filesystem::path& projectPath,
-                              std::error_code&       buildStatus) const;
-
-    void linkStaticLibrary(const BuildTarget&           target,
-                           const std::filesystem::path& projectPath,
-                                 std::error_code&       buildStatus) const;
-
-    void linkDynamicLibrary(const BuildTarget&           target,
-                            const std::filesystem::path& projectPath,
-                                  std::error_code&       buildStatus) const;
+    void linkTarget(const BuildTarget&           target,
+                    const std::filesystem::path& projectPath,
+                          std::error_code&       buildStatus) const;
 
 private:
     std::shared_ptr<spdlog::logger> logger_;

@@ -4,12 +4,19 @@
 #include "subprocess.hpp"
 #include "spdlog/fmt/bundled/color.h"
 
-static std::uint32_t totalItemsToBuild  = 0;
-static std::uint32_t sourceErrorCount   = 0;
-static std::uint32_t targetErrorCount   = 0;
-static std::uint32_t targetSourcesBuilt = 0;
-static std::uint32_t targetItemsBuilt   = 0;
+using namespace cpak;
 
+static std::uint32_t totalItemsToBuild = 0;
+static std::uint32_t sourceErrorCount  = 0;
+static std::uint32_t targetItemsBuilt  = 0;
+
+
+static inline std::string ltrim(std::string str) {
+    using std::begin, std::end;
+    str.erase(begin(str), std::find_if(begin(str), end(str),
+        std::not1(std::ptr_fun<int, int>(std::isspace))));
+    return str;
+}
 
 static inline std::string rtrim(std::string str) {
     using std::rbegin, std::rend, std::end;
@@ -18,15 +25,45 @@ static inline std::string rtrim(std::string str) {
     return str;
 }
 
+static inline std::string trim(std::string str) {
+    return ltrim(rtrim(std::move(str)));
+}
 
-cpak::BuildManager::BuildManager(const std::shared_ptr<spdlog::logger>& logger)
+
+struct CommandResult {
+    std::string output;
+    std::string error;
+    int         exitCode;
+};
+
+static inline CommandResult
+executeInShell(const std::vector<std::string>& arguments) {
+    // Build the source file.
+    auto command = subprocess::Popen(
+        arguments,
+        subprocess::output{subprocess::STDOUT},
+        subprocess::error{subprocess::STDERR},
+        subprocess::shell{true}
+    );
+
+    auto result = command.communicate();
+    return CommandResult {
+        std::string(result.first.buf.begin(), result.first.buf.end()),
+        std::string(result.second.buf.begin(), result.second.buf.end()),
+        command.retcode()
+    };
+}
+
+
+
+BuildManager::BuildManager(const std::shared_ptr<spdlog::logger>& logger)
     : logger_(logger)
 { }
 
 
-void cpak::BuildManager::build(const std::shared_ptr<cpak::CPakFile>& project,
-                               const std::filesystem::path&           projectPath,
-                                     std::error_code&                 buildStatus) const {
+void BuildManager::build(const std::shared_ptr<CPakFile>& project,
+                         const std::filesystem::path&     projectPath,
+                               std::error_code&           buildStatus) const {
     using std::make_error_code;
     if (project == nullptr) {
         buildStatus = make_error_code(std::errc::invalid_argument);
@@ -49,8 +86,8 @@ void cpak::BuildManager::build(const std::shared_ptr<cpak::CPakFile>& project,
 }
 
 std::vector<std::string>
-cpak::BuildManager::getBuildArgumentsNoSources(const cpak::BuildTarget& target,
-                                                     std::error_code&   buildStatus) const {
+BuildManager::getBuildArgumentsNoSources(const BuildTarget&     target,
+                                               std::error_code& buildStatus) const {
     using std::begin, std::end, std::make_error_code;
     std::vector<std::string> arguments;
 
@@ -70,7 +107,7 @@ cpak::BuildManager::getBuildArgumentsNoSources(const cpak::BuildTarget& target,
 
     // Trim whitespaces from end of options if necessary.
     if (target.options != std::nullopt)
-        arguments.emplace_back(rtrim(*target.options));
+        arguments.emplace_back(trim(*target.options));
 
     // Add defines.
     for (const auto& define : target.defines)
@@ -80,8 +117,9 @@ cpak::BuildManager::getBuildArgumentsNoSources(const cpak::BuildTarget& target,
     if (target.search != std::nullopt) {
         for (const auto& includePath : target.search->include)
             arguments.emplace_back(fmt::format("-I {}", includePath));
-        for (const auto& libraryPath : target.search->library)
-            arguments.emplace_back(fmt::format("-L {}", libraryPath));
+        // Only really needed during linking.
+        // for (const auto& libraryPath : target.search->library)
+        //     arguments.emplace_back(fmt::format("-L {}", libraryPath));
         for (const auto& systemPath : target.search->system)
             arguments.emplace_back(fmt::format("-isystem {}", systemPath));
     }
@@ -93,9 +131,9 @@ cpak::BuildManager::getBuildArgumentsNoSources(const cpak::BuildTarget& target,
     return arguments;
 }
 
-void cpak::BuildManager::buildTarget(const cpak::BuildTarget&     target,
-                                     const std::filesystem::path& projectPath,
-                                           std::error_code&       buildStatus) const {
+void BuildManager::buildTarget(const BuildTarget&           target,
+                               const std::filesystem::path& projectPath,
+                                     std::error_code&       buildStatus) const {
     using std::make_error_code;
     if (target.type == TargetType::Undefined) {
         buildStatus = make_error_code(std::errc::invalid_argument);
@@ -107,53 +145,31 @@ void cpak::BuildManager::buildTarget(const cpak::BuildTarget&     target,
         return;
     }
 
-    switch (target.type) {
-    case TargetType::Executable:
-        return buildExecutable(target, projectPath, buildStatus);
-    
-    case TargetType::StaticLibrary: 
-        return buildStaticLibrary(target, projectPath, buildStatus);
-    
-    case TargetType::DynamicLibrary:
-        return buildDynamicLibrary(target, projectPath, buildStatus);
-    }
-}
-
-void cpak::BuildManager::buildExecutable(const cpak::BuildTarget&     target,
-                                         const std::filesystem::path& projectPath,
-                                               std::error_code&       buildStatus) const {
-    using std::make_error_code;
-    logger_->info("Building executable '{}'", target.name.c_str());
-
-    const auto& arguments = getBuildArgumentsNoSources(target, buildStatus);
     buildSources(target, projectPath, buildStatus);
     if (buildStatus.value() != 0) {
         logger_->error("Failed to build sources for target '{}'", target.name.c_str());
         return;
     }
 
-    linkExecutable(target, projectPath, buildStatus);
+    linkTarget(target, projectPath, buildStatus);
     if (buildStatus.value() != 0) {
         logger_->error("Failed to link target '{}'", target.name.c_str());
         return;
     }
+
+    logger_->info(
+        "{} Built target '{}'",
+        fmt::format(
+            fmt::fg(fmt::terminal_color::bright_blue),
+            "{}\%", 100.0f
+        ),
+        target.name.c_str()
+    );
 }
 
-void cpak::BuildManager::buildStaticLibrary(const cpak::BuildTarget&     target,
-                                            const std::filesystem::path& projectPath,
-                                                  std::error_code&       buildStatus) const {
-    using std::make_error_code;
-}
-
-void cpak::BuildManager::buildDynamicLibrary(const cpak::BuildTarget&     target,
-                                             const std::filesystem::path& projectPath,
-                                                   std::error_code&       buildStatus) const {
-    using std::make_error_code;
-}
-
-void cpak::BuildManager::buildSources(const cpak::BuildTarget&     target,
-                                      const std::filesystem::path& projectPath,
-                                            std::error_code&       buildStatus) const {
+void BuildManager::buildSources(const BuildTarget&           target,
+                                const std::filesystem::path& projectPath,
+                                      std::error_code&       buildStatus) const {
     using std::make_error_code;
     const auto& arguments = getBuildArgumentsNoSources(target, buildStatus);
     for (const auto& source : target.sources) {
@@ -180,9 +196,9 @@ void cpak::BuildManager::buildSources(const cpak::BuildTarget&     target,
     }
 }
 
-void cpak::BuildManager::compileSource(const std::vector<std::string>& arguments,
-                                       const std::filesystem::path&    sourcePath,
-                                       const std::filesystem::path&    outputPath) const {
+void BuildManager::compileSource(const std::vector<std::string>& arguments,
+                                 const std::filesystem::path&    sourcePath,
+                                 const std::filesystem::path&    outputPath) const {
     using std::begin, std::end, std::make_error_code;
 
     // Reserve enough for the arguments, the source, and the output.
@@ -192,49 +208,41 @@ void cpak::BuildManager::compileSource(const std::vector<std::string>& arguments
     finalArguments.emplace_back(fmt::format("-c {}", sourcePath.c_str()));
     finalArguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
 
+    // Log source file being built.
+    const auto& percentage = (float)targetItemsBuilt /
+                             (float)totalItemsToBuild;
+
+    logger_->info(
+        "{:<{}} Compiling source '{}'",
+        fmt::format(
+            fmt::fg(fmt::terminal_color::bright_blue),
+            "{}\%", std::round(percentage * 100.0f)
+        ),
+        13, // Because the length of the 100% string is 13.
+        sourcePath.c_str()
+    );
+
     // Log the command.
     std::ostringstream oss;
     for (const auto& arg : finalArguments)
         oss << arg << " ";
-    logger_->warn(oss.str());
+    logger_->debug(oss.str());
 
     // Build the source file.
-    auto command = subprocess::Popen(
-        finalArguments,
-        subprocess::output{subprocess::STDOUT},
-        subprocess::error{subprocess::STDERR},
-        subprocess::shell{true}
-    );
-
-    auto result = command.communicate();
-    if (command.retcode() == 0) {
-        targetSourcesBuilt++;
+    const auto& result = executeInShell(finalArguments);
+    if (result.exitCode == 0) {
+        targetItemsBuilt++;
         return;
     }
 
-    sourceErrorCount++;
-    const auto& coutString = std::string(result.first.buf.begin(), result.first.buf.end());
-    const auto& cerrString = std::string(result.second.buf.begin(), result.second.buf.end());
-
-    // TODO: backtrace errors.
     // Print what happened.
-    logger_->error(fmt::format(
-        fmt::fg(fmt::terminal_color::bright_red),
-        "Error compiling source file!"
-    ));
-    logger_->error(fmt::format(
-        fmt::fg(fmt::terminal_color::bright_red),
-        "Result code: {}", command.retcode()
-    ));
-    logger_->error("{}\n{}\n{}", fmt::format(
-        fmt::fg(fmt::terminal_color::bright_red),
-        "Error messages:"
-    ), coutString, cerrString);
+    sourceErrorCount++;
+    logger_->error("\n{}", result.error);
 }
 
-void cpak::BuildManager::linkExecutable(const cpak::BuildTarget&     target,
-                                        const std::filesystem::path& projectPath,
-                                              std::error_code&       buildStatus) const {
+void BuildManager::linkTarget(const BuildTarget&           target,
+                              const std::filesystem::path& projectPath,
+                                    std::error_code&       buildStatus) const {
     using std::make_error_code;
     std::vector<std::string> arguments;
     arguments.reserve(target.sources.size() + 3); // sources, ld, c++ runtime, and output.
@@ -248,49 +256,59 @@ void cpak::BuildManager::linkExecutable(const cpak::BuildTarget&     target,
         arguments.emplace_back(sourcePath.c_str());
     }
 
-    // Add output.
-    const auto& executable = projectPath / "build" / target.name;
-    const auto& outputName = fmt::format("-o {}", executable.c_str());
-    arguments.emplace_back(outputName);
+    // Add library search directories.
+    for (const auto& directory : target.search->library)
+        arguments.emplace_back(fmt::format("-L {}", directory));
+
+    // Add linking libraries.
     arguments.emplace_back("-lstdc++");
+    for (const auto& library : target.libraries)
+        arguments.emplace_back(fmt::format("-l {}", library));
+
+    // Add output type and output.
+    std::string outputName;
+    const auto& executable = projectPath / "build" / target.name;
+    switch (target.type) {
+    case TargetType::Executable:
+        arguments.emplace_back(fmt::format("-o {}", executable.c_str()));
+        break;
+    case TargetType::StaticLibrary:
+        arguments.emplace_back("-static");
+        arguments.emplace_back(fmt::format("-o {}.a", executable.c_str()));
+        break;
+    case TargetType::DynamicLibrary:
+        arguments.emplace_back("-shared");
+        arguments.emplace_back(fmt::format("-o {}.so", executable.c_str()));
+        break;
+    }
+
+    // Log source file being built.
+    const auto& percentage = (float)targetItemsBuilt /
+                             (float)totalItemsToBuild;
+
+    logger_->info(
+        "{:<{}} Linking executable '{}'",
+        fmt::format(
+            fmt::fg(fmt::terminal_color::bright_blue),
+            "{}\%", std::round(percentage * 100.0f)
+        ),
+        13, // Because the length of the 100% string is 13.
+        executable.c_str()
+    );
 
     // Log the command.
     std::ostringstream oss;
     for (const auto& arg : arguments)
         oss << arg << " ";
-    logger_->warn(oss.str());
+    logger_->debug(oss.str());
 
-    // Build the executable.
-    auto command = subprocess::Popen(
-        arguments,
-        subprocess::output{subprocess::STDOUT},
-        subprocess::error{subprocess::STDERR},
-        subprocess::shell{true}
-    );
-
-    auto result = command.communicate();
-    if (command.retcode() == 0) {
+    // Build the source file.
+    const auto& result = executeInShell(arguments);
+    if (result.exitCode == 0) {
         targetItemsBuilt++;
         return;
     }
 
-    // TODO: track on a per-target basis.
-    targetErrorCount++;
-    const auto& coutString = std::string(result.first.buf.begin(), result.first.buf.end());
-    const auto& cerrString = std::string(result.second.buf.begin(), result.second.buf.end());
-
-    // TODO: backtrace errors.
     // Print what happened.
-    logger_->error(fmt::format(
-        fmt::fg(fmt::terminal_color::bright_red),
-        "Error linking executable!"
-    ));
-    logger_->error(fmt::format(
-        fmt::fg(fmt::terminal_color::bright_red),
-        "Result code: {}", command.retcode()
-    ));
-    logger_->error("{}\n{}\n{}", fmt::format(
-        fmt::fg(fmt::terminal_color::bright_red),
-        "Error messages:"
-    ), coutString, cerrString);
+    logger_->error("\n{}", result.error);
 }
