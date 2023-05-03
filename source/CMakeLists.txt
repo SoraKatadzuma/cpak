@@ -7,6 +7,8 @@ add_executable(
     project.cpp
 )
 
+target_compile_options(cpak PRIVATE -g)
+
 target_link_libraries(
     cpak
     PRIVATE argparse::argparse

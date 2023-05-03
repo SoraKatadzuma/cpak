@@ -265,8 +265,10 @@ void BuildManager::linkTarget(const BuildTarget&           target,
 
     // Add library search directories.
     arguments.emplace_back(fmt::format("-L {}", buildPath.c_str()));
-    for (const auto& directory : target.search->library)
-        arguments.emplace_back(fmt::format("-L {}", directory));
+    if (target.search.has_value()) {
+        for (const auto& directory : target.search->library)
+            arguments.emplace_back(fmt::format("-L {}", directory));
+    }
 
     // Add linking libraries.
     for (const auto& library : target.libraries)
