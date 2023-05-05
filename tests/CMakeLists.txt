@@ -33,6 +33,7 @@ macro(create_test TESTNAME TESTFILE)
 endmacro()
 
 # Create the tests.
+create_test(checksum        checksum_tests.cpp)
 create_test(cpakfile        cpakfile_tests.cpp)
 create_test(build_target    build_target_tests.cpp)
 create_test(build_pipeline  build_pipeline_tests.cpp)

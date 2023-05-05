@@ -43,6 +43,11 @@ public:
     std::shared_ptr<CPakFile> load(const std::filesystem::path& projectPath,
                                          std::error_code&       loadStatus) const;
 
+    /// @brief  Generates a checksum for the given project.
+    /// @param  projectPath The path to the project.
+    /// @return The generated checksum.
+    std::string checksum(const std::filesystem::path& projectPath) const;
+
 private:
     std::shared_ptr<spdlog::logger> logger_;
 };

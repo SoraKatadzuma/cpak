@@ -56,7 +56,12 @@ std::int32_t cpak::Application::run(int argc, char** argv) {
             return EXIT_FAILURE;
         }
 
-        buildMgr_->build(cpakfile, projectPath, commandStatus);
+        // Generate checksum for project, and build path.
+        const auto& checksum  = projectMgr_->checksum(projectPath);
+        const auto& buildPath = projectPath / ".cpak" / checksum;
+
+        // Build the project.
+        buildMgr_->build(cpakfile, projectPath, buildPath, commandStatus);
         if (commandStatus.value() != EXIT_SUCCESS) {
             logger_->error(fmt::format(
                 fmt::fg(fmt::terminal_color::bright_red),

@@ -63,6 +63,7 @@ BuildManager::BuildManager(const std::shared_ptr<spdlog::logger>& logger)
 
 void BuildManager::build(const std::shared_ptr<CPakFile>& project,
                          const std::filesystem::path&     projectPath,
+                         const std::filesystem::path&     buildPath,
                                std::error_code&           buildStatus) const {
     using std::make_error_code;
     if (project == nullptr) {
@@ -76,10 +77,19 @@ void BuildManager::build(const std::shared_ptr<CPakFile>& project,
     for (const auto& target : project->targets)
         totalItemsToBuild += target.sources.size();
 
+    // Assure build paths exist.
+    const auto& binariesPath  = buildPath / "binaries";
+    const auto& librariesPath = buildPath / "libraries";
+    const auto& objectsPath   = buildPath / "objects";
+    if (!std::filesystem::exists(buildPath))     std::filesystem::create_directories(buildPath);
+    if (!std::filesystem::exists(binariesPath))  std::filesystem::create_directories(binariesPath);
+    if (!std::filesystem::exists(librariesPath)) std::filesystem::create_directories(librariesPath);
+    if (!std::filesystem::exists(objectsPath))   std::filesystem::create_directories(objectsPath);
+
     // Build all targets.
     for (const auto& target : project->targets) {
         // TODO: link targets.
-        buildTarget(target, projectPath, buildStatus);
+        buildTarget(target, projectPath, buildPath, buildStatus);
     }
 
     logger_->info("Finished building project '{}'", "temp name");
@@ -133,6 +143,7 @@ BuildManager::getBuildArgumentsNoSources(const BuildTarget&     target,
 
 void BuildManager::buildTarget(const BuildTarget&           target,
                                const std::filesystem::path& projectPath,
+                               const std::filesystem::path& buildPath,
                                      std::error_code&       buildStatus) const {
     using std::make_error_code;
     if (target.type == TargetType::Undefined) {
@@ -145,14 +156,14 @@ void BuildManager::buildTarget(const BuildTarget&           target,
         return;
     }
 
-    buildSources(target, projectPath, buildStatus);
+    buildSources(target, projectPath, buildPath, buildStatus);
     if (buildStatus.value() != 0) {
         logger_->error("Failed to build sources for target '{}'", target.name.c_str());
         return;
     }
 
     itemBuildProgress++;
-    linkTarget(target, projectPath, buildStatus);
+    linkTarget(target, projectPath, buildPath, buildStatus);
     if (buildStatus.value() != 0) {
         logger_->error("Failed to link target '{}'", target.name.c_str());
         return;
@@ -175,6 +186,7 @@ void BuildManager::buildTarget(const BuildTarget&           target,
 
 void BuildManager::buildSources(const BuildTarget&           target,
                                 const std::filesystem::path& projectPath,
+                                const std::filesystem::path& buildPath,
                                       std::error_code&       buildStatus) const {
     using std::make_error_code;
     const auto& arguments = getBuildArgumentsNoSources(target, buildStatus);
@@ -186,15 +198,13 @@ void BuildManager::buildSources(const BuildTarget&           target,
             return;
         }
 
-        // Create the output directory if it doesn't exist.
-        auto outputPath = projectPath / "build" / "objects";
-        if (!std::filesystem::exists(outputPath))
-            std::filesystem::create_directories(outputPath);
-
+        // Create output path.
+        const auto& outputPath = buildPath  / "objects";
+        const auto& outputFile = outputPath / fmt::format("{}.o", sourceFile.filename().c_str());
+        
         // Proceed to compile sources.
         itemBuildProgress++;
-        outputPath = outputPath / fmt::format("{}.o", sourceFile.filename().c_str());
-        compileSource(arguments, sourcePath, outputPath);
+        compileSource(arguments, sourcePath, outputFile);
     }
 
     if (sourceErrorCount > 0) {
@@ -248,6 +258,7 @@ void BuildManager::compileSource(const std::vector<std::string>& arguments,
 
 void BuildManager::linkTarget(const BuildTarget&           target,
                               const std::filesystem::path& projectPath,
+                              const std::filesystem::path& buildPath,
                                     std::error_code&       buildStatus) const {
     using std::make_error_code;
     std::vector<std::string> arguments;
@@ -255,16 +266,18 @@ void BuildManager::linkTarget(const BuildTarget&           target,
     arguments.emplace_back("g++");
 
     // Add sources.
-    const auto& buildPath  = projectPath / "build";
-    const auto& outputPath = buildPath / "objects";
+    const auto& binariesPath  = buildPath / "binaries";
+    const auto& librariesPath = buildPath / "libraries";
+    const auto& objectsPath   = buildPath / "objects";
     for (const auto& source : target.sources) {
         const auto& sourceFile = std::filesystem::path(source);
-        const auto& sourcePath = outputPath / fmt::format("{}.o", sourceFile.filename().c_str());
+        const auto& sourcePath = objectsPath / fmt::format("{}.o", sourceFile.filename().c_str());
         arguments.emplace_back(sourcePath.c_str());
     }
 
     // Add library search directories.
-    arguments.emplace_back(fmt::format("-L {}", buildPath.c_str()));
+    arguments.emplace_back(fmt::format("-L {}", binariesPath.c_str()));
+    arguments.emplace_back(fmt::format("-L {}", librariesPath.c_str()));
     if (target.search.has_value()) {
         for (const auto& directory : target.search->library)
             arguments.emplace_back(fmt::format("-L {}", directory));
@@ -281,18 +294,18 @@ void BuildManager::linkTarget(const BuildTarget&           target,
     const auto& outputType = cpak::buildTypeName(target.type);
     switch (target.type) {
     case TargetType::Executable:
-        targetPath = buildPath / target.name;
+        targetPath = binariesPath / target.name;
         arguments.emplace_back(fmt::format("-o {}", targetPath.c_str()));
         break;
     case TargetType::StaticLibrary:
         targetName = fmt::format("lib{}.a", target.name);
-        targetPath = buildPath / targetName;
+        targetPath = librariesPath / targetName;
         arguments.emplace_back("-r");
         arguments.emplace_back(fmt::format("-o {}", targetPath.c_str()));
         break;
     case TargetType::DynamicLibrary:
         targetName = fmt::format("lib{}.so", target.name);
-        targetPath = buildPath / targetName;
+        targetPath = binariesPath / targetName;
         arguments.emplace_back("-shared");
         arguments.emplace_back(fmt::format("-o {}", targetPath.c_str()));
         break;

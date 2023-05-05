@@ -1,3 +1,4 @@
+#include "checksum.hpp"
 #include "project.hpp"
 #include "spdlog/fmt/bundled/color.h"
 
@@ -52,10 +53,10 @@ cpak::ProjectManager::load(const std::filesystem::path& projectPath,
 
     logger_->debug("Loading CPakfile '{}'", cpakfilePath.c_str());
 
-    std::unique_ptr<CPakFile> cpakfile;
+    std::shared_ptr<CPakFile> cpakfile;
     try {
         const auto& config = YAML::LoadFile(cpakfilePath.string());
-        cpakfile = std::make_unique<CPakFile>(config.as<cpak::CPakFile>());
+        cpakfile = std::make_shared<CPakFile>(config.as<cpak::CPakFile>());
     } catch (const YAML::Exception& e) {
         // TODO: backtrace this.
         logger_->error(fmt::format(
@@ -72,4 +73,18 @@ cpak::ProjectManager::load(const std::filesystem::path& projectPath,
     }
 
     return cpakfile;
+}
+
+std::string cpak::ProjectManager::checksum(const std::filesystem::path& projectPath) const {
+    // Use name of project directory as checksum.
+    std::ostringstream oss;
+    Checksum::block_t  block;
+
+    Checksum checksum(projectPath.filename().string());
+    Checksum::finalize(checksum, block);
+    for (const auto& byte : block)
+        oss << std::hex << std::setfill('0')
+            << std::setw(2) << static_cast<int>(byte);
+    
+    return oss.str();
 }
