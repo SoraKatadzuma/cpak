@@ -3,6 +3,7 @@
 #include <string_view>
 #include <system_error>
 #include "build.hpp"
+#include "configuration.hpp"
 #include "project.hpp"
 #include "argparse/argparse.hpp"
 #include "semver/semver.hpp"
@@ -31,6 +32,7 @@ public:
     static std::string banner() noexcept;
 
 private:
+    void initConfig();
     void initLogger();
     void initProgram();
     void initBuildCommand();
@@ -50,6 +52,7 @@ private:
 
     inline const static semver::version VERSION{ MAJOR, MINOR, PATCH };
 
+    std::shared_ptr<Configuration> config_;
     std::shared_ptr<spdlog::logger> logger_;
     std::shared_ptr<argparse::ArgumentParser> program_;
     std::shared_ptr<argparse::ArgumentParser> buildcmd_;

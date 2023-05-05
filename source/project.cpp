@@ -2,21 +2,23 @@
 #include "project.hpp"
 #include "spdlog/fmt/bundled/color.h"
 
+using namespace cpak;
+
 struct LoadStatusCategory : std::error_category {
     const char* name() const noexcept override {
-        return "cpak::ProjectManager::LoadStatus";
+        return "ProjectManager::LoadStatus";
     }
 
     std::string message(int ev) const override {
-        switch (static_cast<cpak::ProjectManager::LoadStatus>(ev)) {
-        case cpak::ProjectManager::LoadStatus::Success:
+        switch (static_cast<ProjectManager::LoadStatus>(ev)) {
+        case ProjectManager::LoadStatus::Success:
             return "Success";
-        case cpak::ProjectManager::LoadStatus::NoProjectDirectory:
-            return cpak::ProjectManager::kNoProjectDirectoryMessage;
-        case cpak::ProjectManager::LoadStatus::NoCPakFileInProject:
-            return cpak::ProjectManager::kNoCPakFileInProjectMessage;
-        case cpak::ProjectManager::LoadStatus::InvalidCPakfile:
-            return cpak::ProjectManager::kInvalidCPakFileMessage;
+        case ProjectManager::LoadStatus::NoProjectDirectory:
+            return ProjectManager::kNoProjectDirectoryMessage;
+        case ProjectManager::LoadStatus::NoCPakFileInProject:
+            return ProjectManager::kNoCPakFileInProjectMessage;
+        case ProjectManager::LoadStatus::InvalidCPakfile:
+            return ProjectManager::kInvalidCPakFileMessage;
         }
 
         return "(unrecognized error)";
@@ -25,19 +27,19 @@ struct LoadStatusCategory : std::error_category {
 
 
 const LoadStatusCategory loadStatusCategory{};
-std::error_code cpak::make_error_code(cpak::ProjectManager::LoadStatus status) {
+std::error_code cpak::make_error_code(ProjectManager::LoadStatus status) {
     return { static_cast<int>(status), loadStatusCategory };
 }
 
 
-cpak::ProjectManager::ProjectManager(const std::shared_ptr<spdlog::logger>& logger)
+ProjectManager::ProjectManager(const std::shared_ptr<spdlog::logger>& logger)
     : logger_(logger)
 { }
 
 
-std::shared_ptr<cpak::CPakFile>
-cpak::ProjectManager::load(const std::filesystem::path& projectPath,
-                                 std::error_code&       loadStatus) const {
+std::shared_ptr<CPakFile>
+ProjectManager::load(const std::filesystem::path& projectPath,
+                           std::error_code&       loadStatus) const {
     logger_->info("Checking path '{}'", projectPath.c_str());
     if (!std::filesystem::exists(projectPath)) {
         loadStatus = make_error_code(LoadStatus::NoProjectDirectory);
@@ -56,7 +58,7 @@ cpak::ProjectManager::load(const std::filesystem::path& projectPath,
     std::shared_ptr<CPakFile> cpakfile;
     try {
         const auto& config = YAML::LoadFile(cpakfilePath.string());
-        cpakfile = std::make_shared<CPakFile>(config.as<cpak::CPakFile>());
+        cpakfile = std::make_shared<CPakFile>(config.as<CPakFile>());
     } catch (const YAML::Exception& e) {
         // TODO: backtrace this.
         logger_->error(fmt::format(
@@ -75,7 +77,7 @@ cpak::ProjectManager::load(const std::filesystem::path& projectPath,
     return cpakfile;
 }
 
-std::string cpak::ProjectManager::checksum(const std::filesystem::path& projectPath) const {
+std::string ProjectManager::checksum(const std::filesystem::path& projectPath) const {
     // Use name of project directory as checksum.
     std::ostringstream oss;
     Checksum::block_t  block;

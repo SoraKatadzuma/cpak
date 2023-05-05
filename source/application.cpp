@@ -18,12 +18,14 @@ std::string cpak::Application::banner() noexcept {
 
 
 cpak::Application::Application()
-    : logger_{ spdlog::stdout_color_mt("cpak") }
-    , program_{std::make_shared<argparse::ArgumentParser>("cpak")}
-    , buildcmd_{std::make_shared<argparse::ArgumentParser>("build")}
-    , projectMgr_{std::make_shared<ProjectManager>(logger_)}
-    , buildMgr_{std::make_shared<BuildManager>(logger_)}
+    : config_{ std::make_shared<Configuration>() }
+    , logger_{ spdlog::stdout_color_mt("cpak") }
+    , program_{ std::make_shared<argparse::ArgumentParser>("cpak", "1.0", argparse::default_arguments::help) }
+    , buildcmd_{ std::make_shared<argparse::ArgumentParser>("build", "1.0", argparse::default_arguments::help) }
+    , projectMgr_{ std::make_shared<ProjectManager>(logger_) }
+    , buildMgr_{ std::make_shared<BuildManager>(logger_) }
 {
+    initConfig();
     initLogger();
     initProgram();
     initBuildCommand();
@@ -42,6 +44,9 @@ std::int32_t cpak::Application::run(int argc, char** argv) {
         std::cerr << program_  << std::endl;
         return EXIT_FAILURE;
     }
+
+    if (config_->verbose = program_->get<bool>("verbose"))
+        logger_->set_level(spdlog::level::debug);
 
     std::error_code commandStatus{ EXIT_SUCCESS, std::generic_category() };
     if (program_->is_subcommand_used("build")) {
@@ -77,6 +82,10 @@ std::int32_t cpak::Application::run(int argc, char** argv) {
 }
 
 
+void cpak::Application::initConfig() {
+    config_ = std::make_shared<Configuration>();
+}
+
 void cpak::Application::initLogger() {
     logger_->set_pattern("%H:%M:%S %^%l%$ [%n]: %v");
     logger_->set_level(spdlog::level::info);
@@ -84,6 +93,10 @@ void cpak::Application::initLogger() {
 
 void cpak::Application::initProgram() {
     program_->add_description("A YAML based build system for C++ projects.");
+    program_->add_argument("-v", "--verbose")
+             .help("Enable verbose logging")
+             .default_value(false)
+             .implicit_value(true);
 }
 
 void cpak::Application::initBuildCommand() {
