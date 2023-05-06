@@ -1,8 +1,5 @@
 #pragma once
-#include <array>
-#include <cstdint>
-#include <cstring>
-#include <string_view>
+#include "cpakfile.hpp"
 
 namespace cpak {
 
@@ -73,7 +70,7 @@ public:
     }
 
 private:
-    inline static void finalize(Checksum& checksum, digest_t& result) noexcept {
+    static void finalize(Checksum& checksum, digest_t& result) noexcept {
         const auto& bitCount = checksum.byteCount_ * 8;
         update(checksum, 0x80);
         if (checksum.blockOffset_ > 56) {
@@ -94,8 +91,7 @@ private:
         std::memcpy(result.data(), checksum.digest_.data(), 5 * sizeof(std::uint32_t));
     }
 
-    inline static void update(Checksum&    checksum,
-                              std::uint8_t byte) noexcept {
+    static void update(Checksum& checksum, std::uint8_t byte) noexcept {
         constexpr std::uint32_t kChunkSize = 64;
 
         checksum.byteCount_++;
@@ -107,12 +103,11 @@ private:
         processChunk(checksum);
     }
 
-    inline static std::uint32_t leftRotate(std::uint32_t value,
-                                           std::uint32_t count) noexcept {
+    static std::uint32_t leftRotate(std::uint32_t value, std::uint32_t count) noexcept {
         return (value << count) | (value >> (32 - count));
     }
 
-    inline static void processChunk(Checksum& checksum) noexcept {
+    static void processChunk(Checksum& checksum) noexcept {
         constexpr std::uint32_t kPrimeA = 0x5A827999;
         constexpr std::uint32_t kPrimeB = 0x6ED9EBA1;
         constexpr std::uint32_t kPrimeC = 0x8F1BBCDC;
@@ -175,6 +170,28 @@ private:
     std::size_t blockOffset_;
     std::size_t byteCount_;
 };
+
+
+/// @brief  Generates a checksum for the given CPakFile.
+/// @param  cpakfile The CPakFile to generate the checksum for.
+/// @return The generated checksum.
+std::string checksum(const CPakFile& cpakfile) noexcept {
+    std::ostringstream oss;
+    Checksum::block_t  block;
+
+    // TODO: support options.
+    oss << cpakfile.project.name;
+    Checksum checksum(oss.str());
+    Checksum::finalize(checksum, block);
+
+    oss.str("");
+    oss.clear();
+    for (const auto& byte : block)
+        oss << std::hex << std::setfill('0')
+            << std::setw(2) << static_cast<int>(byte);
+
+    return oss.str();
+}
 
 
 }

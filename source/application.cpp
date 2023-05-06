@@ -1,8 +1,5 @@
-#include <sstream>
 #include "application.hpp"
-#include "spdlog/fmt/bundled/color.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "yaml-cpp/yaml.h"
+#include "checksum.hpp"
 
 std::string cpak::Application::version() noexcept {
     return VERSION.str();
@@ -62,8 +59,8 @@ std::int32_t cpak::Application::run(int argc, char** argv) {
         }
 
         // Generate checksum for project, and build path.
-        const auto& checksum  = projectMgr_->checksum(projectPath);
-        const auto& buildPath = projectPath / ".cpak" / checksum;
+        const auto& buildID   = checksum(*cpakfile);
+        const auto& buildPath = projectPath / ".cpak" / buildID;
 
         // Build the project.
         buildMgr_->build(cpakfile, projectPath, buildPath, commandStatus);

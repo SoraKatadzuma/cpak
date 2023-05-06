@@ -8,6 +8,11 @@ using namespace cpak;
 ///////////////////////////////////////////////////////////////////////////////
 TEST(CPakFileTests, canDecodeCPakFile) {
     const auto yamlStr = R"(
+project:
+  name: sample
+  gpid: simtech
+  semv: 1.0.0
+
 targets:
 - name: simtech::base
   type: static_library
@@ -31,24 +36,51 @@ targets:
 ///////////////////////////////////////////////////////////////////////////////
 ///////                    Schema Validation Tests                      ///////
 ///////////////////////////////////////////////////////////////////////////////
-TEST(CPakFileTests, cannotDecodeCPakFileMissingTargets) {
+TEST(CPakFileTests, cannotDecodeCPakFileMissingProject) {
     const auto yamlStr = R"(
-project:
-  name: sample
-  gpid: simtech
-  version: 1.0.0
+targets:
+- name: simtech::base
+  type: static_library
+  options: >
+    -m64 -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
+    -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable
+    -Wno-unused-but-set-parameter -Wno-unused-result -Wno-missing-field-initializers
+  sources:
+    - src/base.cpp
+    - src/base.hpp
 )";
 
     try {
         const auto& yaml     = YAML::Load(yamlStr);
         const auto& cpakfile = yaml.as<CPakFile>();
     } catch (const YAML::Exception& e) {
-        EXPECT_EQ(e.msg, "CPakFile does not contain targets.");
+        EXPECT_EQ(e.msg, "CPakFile must contain project info.");
+    }
+}
+
+TEST(CPakFileTests, cannotDecodeCPakFileMissingTargets) {
+    const auto yamlStr = R"(
+project:
+  name: sample
+  gpid: simtech
+  semv: 1.0.0
+)";
+
+    try {
+        const auto& yaml     = YAML::Load(yamlStr);
+        const auto& cpakfile = yaml.as<CPakFile>();
+    } catch (const YAML::Exception& e) {
+        EXPECT_EQ(e.msg, "CPakFile must contain build targets.");
     }
 }
 
 TEST(CPakFileTests, cannotDecodeCPakFileNonSequenceTargets) {
     const auto yamlStr = R"(
+project:
+  name: sample
+  gpid: simtech
+  semv: 1.0.0
+
 targets: {}
 )";
 
@@ -56,12 +88,17 @@ targets: {}
         const auto& yaml     = YAML::Load(yamlStr);
         const auto& cpakfile = yaml.as<CPakFile>();
     } catch (const YAML::Exception& e) {
-        EXPECT_EQ(e.msg, "CPakFile targets is not a sequence.");
+        EXPECT_EQ(e.msg, "CPakFile targets must be a sequence.");
     }
 }
 
-TEST(CPakfileTests, cannotDecodeCPakFileEmptyTargets) {
+TEST(CPakFileTests, cannotDecodeCPakFileEmptyTargets) {
     const auto yamlStr = R"(
+project:
+  name: sample
+  gpid: simtech
+  semv: 1.0.0
+
 targets: []
 )";
 
@@ -69,6 +106,6 @@ targets: []
         const auto& yaml     = YAML::Load(yamlStr);
         const auto& cpakfile = yaml.as<CPakFile>();
     } catch (const YAML::Exception& e) {
-        EXPECT_EQ(e.msg, "CPakFile targets is empty.");
+        EXPECT_EQ(e.msg, "CPakFile targets must not be empty.");
     }
 }

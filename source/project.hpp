@@ -1,67 +1,119 @@
 #pragma once
-#include <filesystem>
-#include <memory>
-#include "cpakfile.hpp"
-#include "spdlog/spdlog.h"
+#include "version.hpp"
 #include "utilities/noncopyable.hpp"
 
 namespace cpak {
 
-/// @brief Provides utilities towards managing CPak projects.
-class ProjectManager : util::NonCopyable {
-public:
-    /// @brief   The status of a project load operation.
-    /// @details This enum is used to indicate the status of a project load
-    ///          operation. It will be provided as a std::error_code to the
-    ///          caller of \c ProjectManager::load.
-    enum struct LoadStatus {
-        Success,
-        NoProjectDirectory,
-        NoCPakFileInProject,
-        InvalidCPakfile
-    };
 
-    inline static constexpr const char* kNoProjectDirectoryMessage =
-        "Project directory does not exist";
-    
-    inline static constexpr const char* kNoCPakFileInProjectMessage =
-        "CPakFile does not exist in project directory";
+/// @brief  Stores the project information.
+/// @details This struct stores the project information for a CPak project.
+///          It is an extension of a project identity, containing the paths
+///          to the project and build directories, as well as other metadata.
+struct ProjectInfo {
+    // Provided by project manager after loading.
+    // std::filesystem::path projectPath;
+    // std::filesystem::path buildPath;
 
-    inline static constexpr const char* kInvalidCPakFileMessage =
-        "CPakFile is invalid";
+    // Optional fields.
+    std::vector<std::string> authors;
+    std::optional<std::string> description;
+    std::optional<std::string> license;
+    std::optional<std::string> homePage;
+    std::optional<std::string> issuesPage;
 
-public:
-    /// @brief Creates a new \c ProjectManager with the given logger.
-    /// @param logger The logger to use to log messages.
-    explicit ProjectManager(const std::shared_ptr<spdlog::logger>& logger);
-    virtual ~ProjectManager() = default;
-
-    /// @brief  Loads the project from the given path.
-    /// @param  projectPath The path to the project to load.
-    /// @param  loadStatus The status of the load operation.
-    /// @return The loaded project, or \c nullptr if the project could not be loaded.
-    std::shared_ptr<CPakFile> load(const std::filesystem::path& projectPath,
-                                         std::error_code&       loadStatus) const;
-
-    /// @brief  Generates a checksum for the given project.
-    /// @param  projectPath The path to the project.
-    /// @return The generated checksum.
-    std::string checksum(const std::filesystem::path& projectPath) const;
-
-private:
-    std::shared_ptr<spdlog::logger> logger_;
+    // Required fields.
+    std::string name;
+    std::string gpid;
+    version     semv;
 };
 
 
-/// @brief  Makes an error code from the given \c ProjectManager::LoadStatus.
-/// @param  status The status to make an error code from.
-/// @return The constructed error code.
-std::error_code make_error_code(cpak::ProjectManager::LoadStatus status);
+
+static std::filesystem::path absoluteRootPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path absoluteBuildPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path absoluteBinariesPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path absoluteLibrariesPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path absoluteObjectsPath(const ProjectInfo& project) noexcept;
+
+static std::filesystem::path relativeRootPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path relativeBuildPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path relativeBinariesPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path relativeLibrariesPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path relativeObjectsPath(const ProjectInfo& project) noexcept;
+
+
+/// @brief  Validates the given project schema.
+/// @param  node The node to validate.
+inline void validateProjectSchema(const YAML::Node& node) {
+    if (!node.IsMap())
+        throw YAML::Exception(node.Mark(), "Project is not a map");
+    
+    // Validate required fields.
+    if (!node["name"])
+        throw YAML::Exception(node.Mark(), "Project is missing a name.");
+    else if (!node["name"].IsScalar())
+        throw YAML::Exception(node.Mark(), "Project name must be a string.");
+
+    if (!node["gpid"])
+        throw YAML::Exception(node.Mark(), "Project is missing a gpid.");
+    else if (!node["gpid"].IsScalar())
+        throw YAML::Exception(node.Mark(), "Project gpid must be a string.");
+
+    if (!node["semv"])
+        throw YAML::Exception(node.Mark(), "Project is missing a semv.");
+    else if (!node["semv"].IsScalar())
+        throw YAML::Exception(node.Mark(), "Project semv must be a string.");
+
+    // Validate optional fields.        
+    if (node["desc"] && !node["desc"].IsScalar())
+        throw YAML::Exception(node.Mark(), "Project desc must be a string.");
+
+    if (node["home"] && !node["home"].IsScalar())
+        throw YAML::Exception(node.Mark(), "Project home must be a string.");
+
+    if (node["issues"] && !node["issues"].IsScalar())
+        throw YAML::Exception(node.Mark(), "Project issues must be a string.");
+
+    if (node["license"] && !node["license"].IsScalar())
+        throw YAML::Exception(node.Mark(), "Project license must be a string.");
+ 
+    if (node["authors"] && !node["authors"].IsSequence())
+        throw YAML::Exception(node.Mark(), "Project authors must be a sequence.");
+}
 
 
 }
 
+
 template<>
-struct std::is_error_code_enum<cpak::ProjectManager::LoadStatus>
-    : std::true_type
-{ };
+struct YAML::convert<cpak::ProjectInfo> {
+    static Node encode(const cpak::ProjectInfo& rhs) {
+        Node node;
+        node["name"] = rhs.name;
+        node["gpid"] = rhs.gpid;
+        node["semv"] = rhs.semv;
+
+        // Optional fields.
+        if (rhs.description.has_value()) node["desc"]    = *rhs.description;
+        if (rhs.homePage.has_value())    node["home"]    = *rhs.homePage;
+        if (rhs.issuesPage.has_value())  node["issues"]  = *rhs.issuesPage;
+        if (rhs.license.has_value())     node["license"] = *rhs.license;
+        if (!rhs.authors.empty())        node["authors"] = rhs.authors;
+        return node;
+    }
+
+    static bool decode(const Node& node, cpak::ProjectInfo& rhs) {
+        cpak::validateProjectSchema(node);
+        rhs.name = node["name"].as<std::string>();
+        rhs.gpid = node["gpid"].as<std::string>();
+        rhs.semv = node["semv"].as<cpak::version>();
+        
+        // Optional fields.
+        if (node["desc"])    rhs.description = node["desc"].as<std::string>();
+        if (node["home"])    rhs.homePage    = node["home"].as<std::string>();
+        if (node["issues"])  rhs.issuesPage  = node["issues"].as<std::string>();
+        if (node["license"]) rhs.license     = node["license"].as<std::string>();
+        if (node["authors"]) rhs.authors     = node["authors"].as<std::vector<std::string>>();
+        return true;
+    }
+};

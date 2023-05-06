@@ -6,10 +6,10 @@ using namespace cpak;
 ///////////////////////////////////////////////////////////////////////////////
 ///////                    Positive Decoding Tests                      ///////
 ///////////////////////////////////////////////////////////////////////////////
-TEST(BuildTargetTests, canDecodeTarget) {
+TEST(TargetTests, canDecodeTarget) {
     const auto& yamlStr = R"(
 name: simtech::base
-type: static_library
+type: static library
 search:
   include:
     - ./include
@@ -56,9 +56,9 @@ sources:
 ///////////////////////////////////////////////////////////////////////////////
 ///////                    Schema Validation Tests                      ///////
 ///////////////////////////////////////////////////////////////////////////////
-TEST(BuildTargetTests, cannotDecodeTargetMissingName) {
+TEST(TargetTests, cannotDecodeTargetMissingName) {
     const auto& yamlStr = R"(
-type: static_library
+type: static library
 options: >
   -m64 -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
   -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable
@@ -76,11 +76,11 @@ sources:
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeTargetNonScalarName) {
+TEST(TargetTests, cannotDecodeTargetNonScalarName) {
     const auto& yamlStr = R"(
 name:
   - simtech::base
-type: static_library
+type: static library
 options: >
   -m64 -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
   -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable
@@ -98,7 +98,7 @@ sources:
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeTargetMissingType) {
+TEST(TargetTests, cannotDecodeTargetMissingType) {
     const auto& yamlStr = R"(
 name: simtech::base
 options: >
@@ -118,11 +118,11 @@ sources:
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeTargetNonScalarType) {
+TEST(TargetTests, cannotDecodeTargetNonScalarType) {
     const auto& yamlStr = R"(
 name: simtech::base
 type:
-  - static_library
+  - static library
 options: >
   -m64 -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
   -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable
@@ -140,10 +140,10 @@ sources:
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeTargetMissingSources) {
+TEST(TargetTests, cannotDecodeTargetMissingSources) {
     const auto& yamlStr = R"(
 name: simtech::base
-type: static_library
+type: static library
 options: >
   -m64 -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
   -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable
@@ -158,10 +158,10 @@ options: >
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeTargetNonSequenceSources) {
+TEST(TargetTests, cannotDecodeTargetNonSequenceSources) {
     const auto& yamlStr = R"(
 name: simtech::base
-type: static_library
+type: static library
 options: >
   -m64 -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
   -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable
@@ -179,10 +179,10 @@ sources: >
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeTargetNoSources) {
+TEST(TargetTests, cannotDecodeTargetNoSources) {
     const auto& yamlStr = R"(
 name: simtech::base
-type: static_library
+type: static library
 options: >
   -m64 -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
   -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable
@@ -198,10 +198,10 @@ sources: []
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeTargetNonScalarOptions) {
+TEST(TargetTests, cannotDecodeTargetNonScalarOptions) {
     const auto& yamlStr = R"(
 name: simtech::base
-type: static_library
+type: static library
 options:
   - -m64
   - -std=c++17
@@ -229,10 +229,10 @@ sources:
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeTargetNonSequenceDefines) {
+TEST(TargetTests, cannotDecodeTargetNonSequenceDefines) {
     const auto& yamlStr = R"(
 name: simtech::base
-type: static_library
+type: static library
 options: >
   -m64 -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
   -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable
@@ -253,10 +253,10 @@ sources:
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeTargetNonSequenceLibraries) {
+TEST(TargetTests, cannotDecodeTargetNonSequenceLibraries) {
     const auto& yamlStr = R"(
 name: simtech::base
-type: static_library
+type: static library
 options: >
   -m64 -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
   -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable
@@ -277,7 +277,7 @@ sources:
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeNonMapSearchPaths) {
+TEST(TargetTests, cannotDecodeNonMapSearchPaths) {
     const auto& yamlStr = R"(
 search: >
   ./include;
@@ -292,7 +292,7 @@ search: >
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeSearchPathsNonSequenceIncludes) {
+TEST(TargetTests, cannotDecodeSearchPathsNonSequenceIncludes) {
     const auto& yamlStr = R"(
 search:
   include: >
@@ -308,7 +308,7 @@ search:
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeSearchPathsNonSequenceLibraries) {
+TEST(TargetTests, cannotDecodeSearchPathsNonSequenceLibraries) {
     const auto& yamlStr = R"(
 search:
   library: >
@@ -324,7 +324,7 @@ search:
     }
 }
 
-TEST(BuildTargetTests, cannotDecodeSearchPathsNonSequenceSystems) {
+TEST(TargetTests, cannotDecodeSearchPathsNonSequenceSystems) {
     const auto& yamlStr = R"(
 search:
   system: >

@@ -1,6 +1,5 @@
-#include "checksum.hpp"
+#include "../cpakfile.hpp"
 #include "project.hpp"
-#include "spdlog/fmt/bundled/color.h"
 
 using namespace cpak;
 
@@ -17,7 +16,7 @@ struct LoadStatusCategory : std::error_category {
             return ProjectManager::kNoProjectDirectoryMessage;
         case ProjectManager::LoadStatus::NoCPakFileInProject:
             return ProjectManager::kNoCPakFileInProjectMessage;
-        case ProjectManager::LoadStatus::InvalidCPakfile:
+        case ProjectManager::LoadStatus::InvalidCPakFile:
             return ProjectManager::kInvalidCPakFileMessage;
         }
 
@@ -37,28 +36,27 @@ ProjectManager::ProjectManager(const std::shared_ptr<spdlog::logger>& logger)
 { }
 
 
-std::shared_ptr<CPakFile>
+std::optional<CPakFile>
 ProjectManager::load(const std::filesystem::path& projectPath,
                            std::error_code&       loadStatus) const {
     logger_->info("Checking path '{}'", projectPath.c_str());
     if (!std::filesystem::exists(projectPath)) {
         loadStatus = make_error_code(LoadStatus::NoProjectDirectory);
-        return nullptr;
+        return std::nullopt;
     }
 
     const auto& cpakfilePath = projectPath / "CPakFile";
     logger_->info("Checking CPakfile '{}'", cpakfilePath.c_str());
     if (!std::filesystem::exists(cpakfilePath)) {
         loadStatus = make_error_code(LoadStatus::NoCPakFileInProject);
-        return nullptr;
+        return std::nullopt;
     }
 
     logger_->debug("Loading CPakfile '{}'", cpakfilePath.c_str());
 
-    std::shared_ptr<CPakFile> cpakfile;
+    std::optional<CPakFile> cpakfile;
     try {
-        const auto& config = YAML::LoadFile(cpakfilePath.string());
-        cpakfile = std::make_shared<CPakFile>(config.as<CPakFile>());
+        cpakfile = YAML::LoadFile(cpakfilePath.string()).as<CPakFile>();
     } catch (const YAML::Exception& e) {
         // TODO: backtrace this.
         logger_->error(fmt::format(
@@ -70,23 +68,9 @@ ProjectManager::load(const std::filesystem::path& projectPath,
             "{}", e.what()
         ));
 
-        loadStatus = make_error_code(LoadStatus::InvalidCPakfile);
-        cpakfile   = nullptr;
+        loadStatus = make_error_code(LoadStatus::InvalidCPakFile);
+        cpakfile   = std::nullopt;
     }
 
     return cpakfile;
-}
-
-std::string ProjectManager::checksum(const std::filesystem::path& projectPath) const {
-    // Use name of project directory as checksum.
-    std::ostringstream oss;
-    Checksum::block_t  block;
-
-    Checksum checksum(projectPath.filename().string());
-    Checksum::finalize(checksum, block);
-    for (const auto& byte : block)
-        oss << std::hex << std::setfill('0')
-            << std::setw(2) << static_cast<int>(byte);
-    
-    return oss.str();
 }

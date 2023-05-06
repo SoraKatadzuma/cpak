@@ -2,12 +2,13 @@
 add_executable(
     cpak
     application.cpp
-    build.cpp
     entry.cpp
-    project.cpp
+    managers/build.cpp
+    managers/project.cpp
 )
 
 target_compile_options(cpak PRIVATE -g)
+target_precompile_headers(cpak PRIVATE common.hpp)
 
 target_link_libraries(
     cpak

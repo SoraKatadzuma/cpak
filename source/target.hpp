@@ -1,8 +1,5 @@
 #pragma once
-#include <optional>
-#include <string>
-#include <vector>
-#include "yaml-cpp/yaml.h"
+#include "common.hpp"
 
 namespace cpak {
 
@@ -35,7 +32,6 @@ struct BuildTarget {
     std::vector<std::string> defines;
     std::vector<std::string> libraries;
     std::vector<std::string> sources;
-
     std::optional<SearchPaths> search;
     std::optional<std::string> options;
 
@@ -51,8 +47,8 @@ inline std::string buildTypeName(cpak::TargetType type) {
     switch (type) {
     case cpak::TargetType::Undefined:      return "Undefined";
     case cpak::TargetType::Executable:     return "executable";
-    case cpak::TargetType::StaticLibrary:  return "static_library";
-    case cpak::TargetType::DynamicLibrary: return "dynamic_library";
+    case cpak::TargetType::StaticLibrary:  return "static library";
+    case cpak::TargetType::DynamicLibrary: return "dynamic library";
     }
 
     return "Undefined";
@@ -65,9 +61,9 @@ inline std::string buildTypeName(cpak::TargetType type) {
 inline TargetType buildTypeFromName(std::string_view name) {
     if (name == "executable") {
         return cpak::TargetType::Executable;
-    } else if (name == "static_library") {
+    } else if (name == "static library") {
         return cpak::TargetType::StaticLibrary;
-    } else if (name == "dynamic_library") {
+    } else if (name == "dynamic library") {
         return cpak::TargetType::DynamicLibrary;
     }
 
@@ -174,10 +170,10 @@ struct YAML::convert<cpak::BuildTarget> {
         node["sources"] = rhs.sources;
         
         // Handle optional fields.
-        if (rhs.options.has_value()) node["options"]   = *rhs.options;
-        if (rhs.search.has_value())  node["search"]    = *rhs.search;
-        if (rhs.defines.empty())     node["defines"]   = rhs.defines;
-        if (rhs.libraries.empty())   node["libraries"] = rhs.libraries;
+        if (rhs.options.has_value())  node["options"]   = *rhs.options;
+        if (rhs.search.has_value())   node["search"]    = *rhs.search;
+        if (rhs.defines.empty())      node["defines"]   = rhs.defines;
+        if (!rhs.libraries.empty())   node["libraries"] = rhs.libraries;
         return node;
     }
 

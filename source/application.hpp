@@ -1,12 +1,8 @@
 #pragma once
-#include <memory>
-#include <string_view>
-#include <system_error>
-#include "build.hpp"
 #include "configuration.hpp"
 #include "project.hpp"
-#include "argparse/argparse.hpp"
-#include "semver/semver.hpp"
+#include "managers/build.hpp"
+#include "managers/project.hpp"
 
 namespace cpak {
 

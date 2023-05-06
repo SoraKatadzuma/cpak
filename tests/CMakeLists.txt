@@ -1,17 +1,17 @@
 # Create library for tests to link against.
 add_library(
     cpaktesting STATIC
-    ${CMAKE_SOURCE_DIR}/source/build.cpp
-    ${CMAKE_SOURCE_DIR}/source/project.cpp
+    ${CMAKE_SOURCE_DIR}/source/managers/build.cpp
+    ${CMAKE_SOURCE_DIR}/source/managers/project.cpp
 )
 
-target_include_directories(
-    cpaktesting
-    PUBLIC ${CMAKE_SOURCE_DIR}/source
-)
+target_include_directories(cpaktesting PUBLIC ${CMAKE_SOURCE_DIR}/source)
+target_precompile_headers(cpaktesting PUBLIC ${CMAKE_SOURCE_DIR}/source/common.hpp)
 
 target_link_libraries(
     cpaktesting
+    PUBLIC argparse::argparse
+    PUBLIC semver::semver
     PUBLIC spdlog::spdlog
     PUBLIC yaml-cpp
     PUBLIC subprocess
@@ -35,6 +35,7 @@ endmacro()
 # Create the tests.
 create_test(checksum        checksum_tests.cpp)
 create_test(cpakfile        cpakfile_tests.cpp)
-create_test(build_target    build_target_tests.cpp)
+create_test(project         project_tests.cpp)
+create_test(target          target_tests.cpp)
 create_test(build_pipeline  build_pipeline_tests.cpp)
 create_test(project_manager project_manager_tests.cpp)

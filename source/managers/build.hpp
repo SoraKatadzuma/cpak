@@ -1,8 +1,6 @@
 #pragma once
-#include <filesystem>
-#include "cpakfile.hpp"
-#include "spdlog/spdlog.h"
-#include "utilities/noncopyable.hpp"
+#include "../cpakfile.hpp"
+#include "../utilities/noncopyable.hpp"
 
 namespace cpak {
 
@@ -19,10 +17,10 @@ public:
     /// @param projectPath The path to the project to build.
     /// @param buildPath   The path to the build directory.
     /// @param buildStatus The status of the build operation.
-    void build(const std::shared_ptr<CPakFile>& project,
-               const std::filesystem::path&     projectPath,
-               const std::filesystem::path&     buildPath,
-                     std::error_code&           buildStatus) const;
+    void build(const std::optional<CPakFile>& project,
+               const std::filesystem::path&   projectPath,
+               const std::filesystem::path&   buildPath,
+                     std::error_code&         buildStatus) const;
 
 private:
     std::vector<std::string>

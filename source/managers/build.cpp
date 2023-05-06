@@ -1,8 +1,4 @@
-#include <algorithm>
-#include <sstream>
 #include "build.hpp"
-#include "subprocess.hpp"
-#include "spdlog/fmt/bundled/color.h"
 
 using namespace cpak;
 
@@ -61,12 +57,12 @@ BuildManager::BuildManager(const std::shared_ptr<spdlog::logger>& logger)
 { }
 
 
-void BuildManager::build(const std::shared_ptr<CPakFile>& project,
-                         const std::filesystem::path&     projectPath,
-                         const std::filesystem::path&     buildPath,
-                               std::error_code&           buildStatus) const {
+void BuildManager::build(const std::optional<CPakFile>& project,
+                         const std::filesystem::path&   projectPath,
+                         const std::filesystem::path&   buildPath,
+                               std::error_code&         buildStatus) const {
     using std::make_error_code;
-    if (project == nullptr) {
+    if (project == std::nullopt) {
         buildStatus = make_error_code(std::errc::invalid_argument);
         return;
     }

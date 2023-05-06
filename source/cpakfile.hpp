@@ -1,5 +1,5 @@
 #pragma once
-#include <iostream>
+#include "project.hpp"
 #include "target.hpp"
 
 
@@ -10,6 +10,9 @@ namespace cpak {
 ///          includes the build targets.
 struct CPakFile {
     std::vector<BuildTarget> targets;
+    // std::vector<ProjectOption> options;
+
+    ProjectInfo project;
 };
 
 
@@ -18,13 +21,16 @@ struct CPakFile {
 inline void validateCPakFileSchema(const YAML::Node& node) {
     if (!node.IsMap())
         throw YAML::Exception(node.Mark(), "CPakFile is not a map");
-    
+
+    if (!node["project"])
+        throw YAML::Exception(node.Mark(), "CPakFile must contain project info.");
+
     if (!node["targets"])
-        throw YAML::Exception(node.Mark(), "CPakFile does not contain targets.");
+        throw YAML::Exception(node.Mark(), "CPakFile must contain build targets.");
     else if (!node["targets"].IsSequence())
-        throw YAML::Exception(node.Mark(), "CPakFile targets is not a sequence.");
+        throw YAML::Exception(node.Mark(), "CPakFile targets must be a sequence.");
     else if (node["targets"].size() == 0)
-        throw YAML::Exception(node.Mark(), "CPakFile targets is empty.");
+        throw YAML::Exception(node.Mark(), "CPakFile targets must not be empty.");
 }
 
 
@@ -35,6 +41,7 @@ template<>
 struct YAML::convert<cpak::CPakFile> {
     static Node encode(const cpak::CPakFile& rhs) {
         Node node;
+        node["project"] = rhs.project;
         for (const auto& target : rhs.targets)
             node["targets"].push_back(target);
 
@@ -43,6 +50,8 @@ struct YAML::convert<cpak::CPakFile> {
 
     static bool decode(const Node& node, cpak::CPakFile& rhs) {
         cpak::validateCPakFileSchema(node);
+
+        rhs.project = node["project"].as<cpak::ProjectInfo>();
         for (const auto& target : node["targets"])
             rhs.targets.push_back(target.as<cpak::BuildTarget>());
         

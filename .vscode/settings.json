@@ -74,12 +74,16 @@
         "valarray": "cpp",
         "variant": "cpp",
         "complex": "cpp",
-        "typeindex": "cpp"
+        "typeindex": "cpp",
+        "strstream": "cpp"
     },
     "cSpell.words": [
         "argparse",
         "cpak",
+        "cpakfile",
         "gpid",
+        "semv",
+        "simtech",
         "spdlog"
     ]
 }
