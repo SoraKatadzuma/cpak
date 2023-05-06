@@ -75,5 +75,11 @@
         "variant": "cpp",
         "complex": "cpp",
         "typeindex": "cpp"
-    }
+    },
+    "cSpell.words": [
+        "argparse",
+        "cpak",
+        "gpid",
+        "spdlog"
+    ]
 }
