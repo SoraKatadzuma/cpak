@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <sstream>
 #include "build.hpp"
 
 using namespace cpak;
@@ -171,11 +173,8 @@ void BuildManager::buildTarget(const BuildTarget&           target,
 
     // Because the length of the 100% string is 13.
     logger_->info(
-        "{:<13} Built target '{}'",
-        fmt::format(
-            fmt::fg(fmt::terminal_color::bright_blue),
-            "{}\%", std::round(percentage * 100.0f)
-        ),
+        "{:<4} Built target '{}'",
+        fmt::format("{}\%", std::round(percentage * 100.0f)),
         target.name.c_str()
     );
 }
@@ -227,11 +226,8 @@ void BuildManager::compileSource(const std::vector<std::string>& arguments,
 
     // Because the length of the 100% string is 13.
     logger_->info(
-        "{:<13} Compiling source '{}'",
-        fmt::format(
-            fmt::fg(fmt::terminal_color::bright_blue),
-            "{}\%", std::round(percentage * 100.0f)
-        ),
+        "{:<4} Compiling source '{}'",
+        fmt::format("{}\%", std::round(percentage * 100.0f)),
         sourcePath.c_str()
     );
 
@@ -313,11 +309,8 @@ void BuildManager::linkTarget(const BuildTarget&           target,
 
     // Because the length of the 100% string is 13.
     logger_->info(
-        "{:<13} Linking {} '{}'",
-        fmt::format(
-            fmt::fg(fmt::terminal_color::bright_blue),
-            "{}\%", std::round(percentage * 100.0f)
-        ),
+        "{:<4} Linking {} '{}'",
+        fmt::format("{}\%", std::round(percentage * 100.0f)),
         outputType.c_str(),
         targetPath.c_str()
     );

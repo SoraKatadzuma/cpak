@@ -1,5 +1,6 @@
 #include "application.hpp"
 #include "utilities/checksum.hpp"
+#include "utilities/logging.hpp"
 
 std::string cpak::Application::version() noexcept {
     return VERSION.str();
@@ -16,7 +17,7 @@ std::string cpak::Application::banner() noexcept {
 
 cpak::Application::Application()
     : config_{ std::make_shared<Configuration>() }
-    , logger_{ spdlog::stdout_color_mt("cpak") }
+    , logger_{ std::make_shared<spdlog::logger>("cpak") }
     , program_{ std::make_shared<argparse::ArgumentParser>("cpak", "1.0", argparse::default_arguments::help) }
     , buildcmd_{ std::make_shared<argparse::ArgumentParser>("build", "1.0", argparse::default_arguments::help) }
     , projectMgr_{ std::make_shared<ProjectManager>(logger_) }
@@ -42,8 +43,13 @@ std::int32_t cpak::Application::run(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
+    // Create console printer and set logging level.
+    auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    consoleSink->set_level(spdlog::level::info);
+    consoleSink->set_pattern("%H:%M:%S %^%-7l%$ [%n]: %v");
     if (config_->verbose = program_->get<bool>("verbose"))
-        logger_->set_level(spdlog::level::debug);
+        consoleSink->set_level(spdlog::level::debug);
+    logger_->sinks().push_back(consoleSink);
 
     std::error_code commandStatus{ EXIT_SUCCESS, std::generic_category() };
     if (program_->is_subcommand_used("build")) {
@@ -57,6 +63,21 @@ std::int32_t cpak::Application::run(int argc, char** argv) {
             ));
             return EXIT_FAILURE;
         }
+
+        // Create sinks for logging, logger, and add sinks.
+        const auto& loggingPath = projectPath / ".cpak" / "logs";
+        const auto& logFileStr  = utilities::getLogFileName(cpakfile->project.name);
+        const auto& fileSink    = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
+            loggingPath / logFileStr
+        );
+
+        fileSink->set_level(spdlog::level::trace);
+        fileSink->set_pattern("%H:%M:%S %^%-7l%$ [%n]: %v");
+        logger_->sinks().push_back(fileSink);
+
+        // Make sure the logging directory is created.
+        if (!std::filesystem::exists(loggingPath))
+            std::filesystem::create_directories(loggingPath);
 
         // Generate checksum for project, and build path.
         const auto& buildID   = utilities::checksum(*cpakfile);
@@ -84,8 +105,7 @@ void cpak::Application::initConfig() {
 }
 
 void cpak::Application::initLogger() {
-    logger_->set_pattern("%H:%M:%S %^%l%$ [%n]: %v");
-    logger_->set_level(spdlog::level::info);
+    logger_->set_level(spdlog::level::trace);
 }
 
 void cpak::Application::initProgram() {

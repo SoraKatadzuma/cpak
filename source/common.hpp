@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -19,5 +20,6 @@
 #include "spdlog/fmt/fmt.h"
 #include "spdlog/fmt/bundled/color.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/sinks/basic_file_sink.h"
 #include "semver/semver.hpp"
 #include "yaml-cpp/yaml.h"
