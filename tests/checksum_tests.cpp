@@ -1,11 +1,11 @@
 #include <sstream>
-#include "checksum.hpp"
+#include "utilities/checksum.hpp"
 #include "gtest/gtest.h"
 
 TEST(ChecksumTests, canReplicateChecksum) {
-    cpak::Checksum actual("cpaktest");
-    cpak::Checksum::block_t block;
-    cpak::Checksum::finalize(actual, block);
+    cpak::utilities::Checksum actual("cpaktest");
+    cpak::utilities::Checksum::block_t block;
+    cpak::utilities::Checksum::finalize(actual, block);
 
     std::ostringstream oss;
     for (const auto& byte : block)

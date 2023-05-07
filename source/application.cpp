@@ -1,5 +1,5 @@
 #include "application.hpp"
-#include "checksum.hpp"
+#include "utilities/checksum.hpp"
 
 std::string cpak::Application::version() noexcept {
     return VERSION.str();
@@ -59,7 +59,7 @@ std::int32_t cpak::Application::run(int argc, char** argv) {
         }
 
         // Generate checksum for project, and build path.
-        const auto& buildID   = checksum(*cpakfile);
+        const auto& buildID   = utilities::checksum(*cpakfile);
         const auto& buildPath = projectPath / ".cpak" / buildID;
 
         // Build the project.

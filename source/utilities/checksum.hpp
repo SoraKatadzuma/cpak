@@ -1,7 +1,7 @@
 #pragma once
-#include "cpakfile.hpp"
+#include "../cpakfile.hpp"
 
-namespace cpak {
+namespace cpak::utilities {
 
 
 /// @brief   Structure for calculating a SHA-1 checksum.
@@ -175,7 +175,7 @@ private:
 /// @brief  Generates a checksum for the given CPakFile.
 /// @param  cpakfile The CPakFile to generate the checksum for.
 /// @return The generated checksum.
-std::string checksum(const CPakFile& cpakfile) noexcept {
+inline std::string checksum(const CPakFile& cpakfile) noexcept {
     std::ostringstream oss;
     Checksum::block_t  block;
 
