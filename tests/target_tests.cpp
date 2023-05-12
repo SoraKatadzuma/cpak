@@ -22,6 +22,9 @@ search:
 libraries:
   - projectA
   - projectB
+interfaces:
+  - simtech::sample1
+  - simtech::sample2
 defines:
   - SIMTECH_BASE
   - SIMTECH_BASE_VERSION=1
@@ -37,19 +40,19 @@ sources:
     const auto& yaml   = YAML::Load(yamlStr);
     const auto& target = yaml.as<BuildTarget>();
 
-    EXPECT_EQ(target.name, "simtech::base");
+    EXPECT_EQ(target.name, std::string("simtech::base"));
     EXPECT_EQ(target.type, TargetType::StaticLibrary);
 
     EXPECT_TRUE(target.search.has_value());
-    EXPECT_EQ(target.search->include.size(), 3);
-    EXPECT_EQ(target.search->system.size(), 0);
-    EXPECT_EQ(target.search->library.size(), 3);
-    EXPECT_EQ(target.libraries.size(), 2);
-    EXPECT_EQ(target.defines.size(), 2);
-    EXPECT_EQ(target.sources.size(), 2);
+    EXPECT_EQ(target.search->include->size(), 3);
+    EXPECT_EQ(target.search->system->size(), 0);
+    EXPECT_EQ(target.search->library->size(), 3);
+    EXPECT_EQ(target.libraries->size(), 2);
+    EXPECT_EQ(target.defines->size(), 2);
+    EXPECT_EQ(target.sources->size(), 2);
 
     EXPECT_TRUE(target.options.has_value());
-    EXPECT_EQ(target.options->size(), 223);
+    EXPECT_EQ(target.options->size(), 13);
 }
 
 
@@ -250,6 +253,30 @@ sources:
         const auto& target = yaml.as<BuildTarget>();
     } catch (const YAML::Exception& e) {
         EXPECT_EQ(e.msg, "Target defines must be a sequence.");
+    }
+}
+
+TEST(TargetTests, cannotDecodeTargetNonSequenceInterfaces) {
+    const auto& yamlStr = R"(
+name: simtech::base
+type: static library
+options: >
+  -m64 -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
+  -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable
+  -Wno-unused-but-set-parameter -Wno-unused-result -Wno-missing-field-initializers
+interfaces: >
+  - simtech::sample1
+  - simtech::sample2
+sources:
+  - src/base.cpp
+  - src/base.hpp
+)";
+    
+    try {
+        const auto& yaml   = YAML::Load(yamlStr);
+        const auto& target = yaml.as<BuildTarget>();
+    } catch (const YAML::Exception& e) { 
+        EXPECT_EQ(e.msg, "Target interfaces must be a sequence.");
     }
 }
 

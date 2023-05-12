@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "property.hpp"
 
 namespace cpak {
 
@@ -10,6 +10,7 @@ enum struct TargetType {
     Executable,
     StaticLibrary,
     DynamicLibrary,
+    Interface,
 };
 
 
@@ -20,23 +21,23 @@ enum struct TargetType {
 /// @remarks This is based on the options that are available in the GNU
 ///          toolchain.
 struct SearchPaths {
-    std::vector<std::string> include;
-    std::vector<std::string> system;
-    std::vector<std::string> library;
+    VectorProperty<std::string> include;
+    VectorProperty<std::string> system;
+    VectorProperty<std::string> library;
 };
 
 
 /// @brief   Contains the build target information.
 /// @details ...
 struct BuildTarget {
-    std::vector<std::string> defines;
-    std::vector<std::string> libraries;
-    std::vector<std::string> sources;
-    std::optional<SearchPaths> search;
-    std::optional<std::string> options;
-
-    std::string name;
-    TargetType  type;
+    VectorProperty<std::string> defines;
+    VectorProperty<std::string> interfaces;
+    VectorProperty<std::string> libraries;
+    VectorProperty<std::string> sources;
+    VectorProperty<std::string> options;
+    OptionalProperty<SearchPaths> search;
+    RequiredProperty<std::string> name;
+    RequiredProperty<TargetType> type;
 };
 
 
@@ -49,6 +50,7 @@ inline std::string buildTypeName(cpak::TargetType type) {
     case cpak::TargetType::Executable:     return "executable";
     case cpak::TargetType::StaticLibrary:  return "static library";
     case cpak::TargetType::DynamicLibrary: return "dynamic library";
+    case cpak::TargetType::Interface:      return "interface";
     }
 
     return "Undefined";
@@ -65,6 +67,8 @@ inline TargetType buildTypeFromName(std::string_view name) {
         return cpak::TargetType::StaticLibrary;
     } else if (name == "dynamic library") {
         return cpak::TargetType::DynamicLibrary;
+    } else if (name == "interface") {
+        return cpak::TargetType::Interface;
     }
 
     return cpak::TargetType::Undefined;
@@ -116,28 +120,46 @@ inline void validateTargetSchema(const YAML::Node& node) {
         throw YAML::Exception(node.Mark(), "Target sources must not be empty.");
 
     // Validate optional fields if present.
-    if (node["options"] && !node["options"].IsScalar())
-        throw YAML::Exception(node.Mark(), "Target options must be a string.");
-
     if (node["defines"] && !node["defines"].IsSequence())
         throw YAML::Exception(node.Mark(), "Target defines must be a sequence.");
 
+    if (node["interfaces"] && !node["interfaces"].IsSequence())
+        throw YAML::Exception(node.Mark(), "Target interfaces must be a sequence.");
+
     if (node["libraries"] && !node["libraries"].IsSequence())
         throw YAML::Exception(node.Mark(), "Target libraries must be a sequence.");
+
+    if (node["options"] && !node["options"].IsScalar())
+        throw YAML::Exception(node.Mark(), "Target options must be a string.");
 }
 
 }
 
 
 template<>
-struct YAML::convert<cpak::TargetType> {
-    static Node encode(const cpak::TargetType& rhs) {
-        return Node(cpak::buildTypeName(rhs));
+struct YAML::convert<cpak::RequiredProperty<cpak::TargetType>> {
+    static Node encode(const cpak::RequiredProperty<cpak::TargetType>& rhs) {
+        return Node(cpak::buildTypeName(*rhs));
     }
 
-    static bool decode(const Node& node, cpak::TargetType& rhs) {
+    static bool decode(const Node& node, cpak::RequiredProperty<cpak::TargetType>& rhs) {
         cpak::validateTargetTypeSchema(node);
         rhs = cpak::buildTypeFromName(node.as<std::string>());
+        return true;
+    }
+};
+
+template<>
+struct YAML::convert<cpak::OptionalProperty<cpak::SearchPaths>> {
+    static Node encode(const cpak::OptionalProperty<cpak::SearchPaths>& rhs) {
+        return rhs.has_value()
+            ? Node(*rhs)
+            : Node();
+    }
+
+    static bool decode(const Node& node, cpak::OptionalProperty<cpak::SearchPaths>& rhs) {
+        cpak::validateSearchPathsSchema(node);
+        rhs = node.as<cpak::SearchPaths>();
         return true;
     }
 };
@@ -164,28 +186,36 @@ struct YAML::convert<cpak::SearchPaths> {
 template<>
 struct YAML::convert<cpak::BuildTarget> {
     static Node encode(const cpak::BuildTarget& rhs) {
+        using namespace cpak;
+
         Node node;
         node["name"]    = rhs.name;
         node["type"]    = rhs.type;
         node["sources"] = rhs.sources;
         
         // Handle optional fields.
-        if (rhs.options.has_value())  node["options"]   = *rhs.options;
-        if (rhs.search.has_value())   node["search"]    = *rhs.search;
-        if (rhs.defines.empty())      node["defines"]   = rhs.defines;
-        if (!rhs.libraries.empty())   node["libraries"] = rhs.libraries;
+        if (rhs.search)     node["search"]     = rhs.search;
+        if (rhs.options)    node["options"]    = vectorPropertyToString(rhs.options);
+        if (rhs.defines)    node["defines"]    = rhs.defines;
+        if (rhs.libraries)  node["libraries"]  = rhs.libraries;
+        if (rhs.interfaces) node["interfaces"] = rhs.interfaces;
         return node;
     }
 
     static bool decode(const Node& node, cpak::BuildTarget& rhs) {
-        cpak::validateTargetSchema(node);
-        rhs.name    = node["name"].as<std::string>();
-        rhs.type    = node["type"].as<cpak::TargetType>();
-        rhs.sources = node["sources"].as<std::vector<std::string>>();
-        if (node["options"])   rhs.options   = node["options"].as<std::string>();
-        if (node["defines"])   rhs.defines   = node["defines"].as<std::vector<std::string>>();
-        if (node["libraries"]) rhs.libraries = node["libraries"].as<std::vector<std::string>>();
-        if (node["search"])    rhs.search    = node["search"].as<cpak::SearchPaths>();
+        using namespace cpak;
+        
+        validateTargetSchema(node);
+        rhs.name    = node["name"].as<RequiredProperty<std::string>>();
+        rhs.type    = node["type"].as<RequiredProperty<TargetType>>();
+        rhs.sources = node["sources"].as<VectorProperty<std::string>>();
+
+        // Handle optional fields.
+        if (node["search"])     rhs.search     = node["search"].as<OptionalProperty<SearchPaths>>();
+        if (node["options"])    rhs.options    = vectorPropertyFromString(node["options"].as<std::string>());
+        if (node["defines"])    rhs.defines    = node["defines"].as<VectorProperty<std::string>>();
+        if (node["libraries"])  rhs.libraries  = node["libraries"].as<VectorProperty<std::string>>();
+        if (node["interfaces"]) rhs.interfaces = node["interfaces"].as<VectorProperty<std::string>>();
         return true;
     }
 };
