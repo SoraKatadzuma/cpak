@@ -253,12 +253,29 @@ struct Property<std::vector<TContained>, false> {
 
     /// @brief   Pipes the given \c Property into this \c Property.
     /// @param   rhs The property to pipe into this one.
+    /// @return  Th newly created property.
+    Property operator|(const Property& rhs) noexcept {
+        Property result = *this;
+        std::copy_if(
+            rhs.value_.begin(),
+            rhs.value_.end(),
+            std::back_inserter(result.value_),
+            [this](const auto& value) {
+                return std::find(value_.begin(), value_.end(), value) == value_.end();
+            }
+        );
+
+        return result;
+    }
+
+    /// @brief   Pipes the given \c Property into this \c Property.
+    /// @param   rhs The property to pipe into this one.
     /// @return  This updated property.
     /// @remarks This will append unique values from the given property into
     ///          this property. It's treated like a set to prevent duplicates.
     ///          This operation is very specific to the way that \c BuildTargets
     ///          will be used.
-    Property& operator|(const Property& rhs) {
+    Property& operator|=(const Property& rhs) noexcept {
         std::copy_if(
             rhs.value_.begin(),
             rhs.value_.end(),
