@@ -5,7 +5,7 @@
 namespace cpak {
 
 
-/// @brief  Stores the project information.
+/// @brief   Stores the project information.
 /// @details This struct stores the project information for a CPak project.
 ///          It is an extension of a project identity, containing the paths
 ///          to the project and build directories, as well as other metadata.

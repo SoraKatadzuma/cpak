@@ -89,12 +89,6 @@ struct Property {
         return value_.has_value();
     }
 
-    /// @brief  Checks whether or not this \c Property has a value.
-    /// @return \c true if this \c Property has a value, \c false otherwise.
-    operator bool() const noexcept {
-        return value_.has_value();
-    }
-
     /// @brief  Gets the value of this \c Property.
     /// @return The value of this \c Property.
     TContained& operator*() noexcept {
@@ -221,12 +215,6 @@ struct Property<std::vector<TContained>, false> {
         return value_.size() > 0;
     }
 
-    /// @brief  Checks whether or not this \c Property has a value.
-    /// @return \c true if this \c Property has a value, \c false otherwise.
-    operator bool() const noexcept {
-        return value_.size() > 0;
-    }
-
     /// @brief  Gets the value of this \c Property.
     /// @return The value of this \c Property.
     std::vector<TContained>& operator*() noexcept {
@@ -329,12 +317,13 @@ vectorPropertyFromString(std::string_view value, char delimiter = ' ') noexcept 
 
 /// @brief  Creates a string from a vector property.
 /// @param  property The property to create the string from.
+/// @param  delimiter How to join the values into a string.
 /// @return The created string.
 inline std::string
-vectorPropertyToString(const VectorProperty<std::string>& property) noexcept {
+vectorPropertyToString(const VectorProperty<std::string>& property, char delimiter = ' ') noexcept {
     std::ostringstream oss;
     for (const auto& value : *property)
-        oss << value << " ";
+        oss << value << delimiter;
     return oss.str();
 }
 

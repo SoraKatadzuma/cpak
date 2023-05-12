@@ -23,10 +23,17 @@ public:
                      std::error_code&         buildStatus) const;
 
 private:
+    static void resetBuildProgress() noexcept;
+    void logBuildProgress(std::string_view message,
+                          std::string_view target) const noexcept;
+
+    void logBuildCommand(const std::vector<std::string>& arguments) const noexcept;
+
     std::vector<std::string>
         getBuildArgumentsNoSources(const BuildTarget& target, std::error_code&) const;
 
-    void buildTarget(const BuildTarget&           target,
+    void buildTarget(const CPakFile&              project,
+                     const BuildTarget&           target,
                      const std::filesystem::path& projectPath,
                      const std::filesystem::path& buildPath,
                            std::error_code&       buildStatus) const;
@@ -46,6 +53,10 @@ private:
                           std::error_code&       buildStatus) const;
 
 private:
+    inline static std::uint32_t totalItemsToBuild_{0};
+    inline static std::uint32_t itemBuildProgress_{0};
+    inline static std::uint32_t sourceErrorCount_{0};
+
     std::shared_ptr<spdlog::logger> logger_;
 };
 

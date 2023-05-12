@@ -1,30 +1,81 @@
-#include <algorithm>
-#include <sstream>
 #include "build.hpp"
+#include "../utilities/logging.hpp"
 
 using namespace cpak;
 
-static std::uint32_t totalItemsToBuild = 0;
-static std::uint32_t sourceErrorCount  = 0;
-static std::uint32_t itemBuildProgress = 0;
+constexpr static std::string_view kWhitespace = " \t\n\r\f\v";
 
-
-static inline std::string ltrim(std::string str) {
-    using std::begin, std::end;
-    str.erase(begin(str), std::find_if(begin(str), end(str),
-        std::not1(std::ptr_fun<int, int>(std::isspace))));
-    return str;
+inline static std::string ltrim(std::string input) {
+    // Erase all leading whitespaces.
+    // Much more readable than the previous version.
+    return input.substr(input.find_first_not_of(kWhitespace));
 }
 
-static inline std::string rtrim(std::string str) {
-    using std::rbegin, std::rend, std::end;
-    str.erase(std::find_if(rbegin(str), rend(str),
-        std::not1(std::ptr_fun<int, int>(std::isspace))).base(), end(str));
-    return str;
+inline static std::string rtrim(std::string input) {
+    // Erase all trailing whitespaces.
+    // Much more readable than the previous version.
+    return input.substr(0, input.find_last_not_of(kWhitespace) + 1);
 }
 
-static inline std::string trim(std::string str) {
-    return ltrim(rtrim(std::move(str)));
+inline static std::string trim(std::string input) {
+    return ltrim(rtrim(std::move(input)));
+}
+
+inline static void
+copyInterfacePropertiesToTarget(const BuildTarget& interface,
+                                      BuildTarget& result) noexcept {
+    // This is a recursive function, so let's do this last.
+    result.name       = interface.name;
+    result.type       = interface.type;
+    result.defines   |= interface.defines;
+    result.libraries |= interface.libraries;
+    result.sources   |= interface.sources;
+    result.options   |= interface.options;
+
+    // Copy search paths.
+    if (result.search != std::nullopt) {
+        result.search->include |= interface.search->include;
+        result.search->system  |= interface.search->system;
+        result.search->library |= interface.search->library;
+    }
+}
+
+static std::error_code
+flattenInterfaceTarget(const std::vector<BuildTarget>& targets,
+                       const BuildTarget&              interface,
+                             BuildTarget&              result) noexcept {
+    // If this interface inherits from other interfaces, flatten those into this one.
+    for (const auto& inherited : *interface.interfaces) {
+        // Find the target in our list.
+        const auto& targetInterface = std::find_if(
+            targets.begin(), targets.end(),
+            [&inherited](const auto& target) {
+                return target.name == inherited;
+            }
+        );
+
+        // If we didn't find the target report error.
+        if (targetInterface == targets.end())
+            return make_error_code(std::errc::invalid_argument);
+
+        // If target is not an interfaces report error.
+        if (targetInterface->type != TargetType::Interface)
+            return make_error_code(std::errc::invalid_argument);
+
+        // Flatten the interface.
+        flattenInterfaceTarget(targets, *targetInterface, result);
+    }
+
+    // Copy properties from interface to target.
+    copyInterfacePropertiesToTarget(interface, result);
+    return std::error_code{ 0, std::generic_category() };
+}
+
+inline static std::error_code
+constructConsolidatedTarget(const std::vector<BuildTarget>& targets,
+                            const BuildTarget&              target,
+                                  BuildTarget&              result) noexcept {
+    return flattenInterfaceTarget(targets, target, result);
 }
 
 
@@ -71,9 +122,10 @@ void BuildManager::build(const std::optional<CPakFile>& project,
 
     // Collect all targets to build.
     logger_->info("Building project '{}'", "temp name");
-    totalItemsToBuild = project->targets.size();
+    totalItemsToBuild_ = project->targets.size();
     for (const auto& target : project->targets)
-        totalItemsToBuild += target.sources.size();
+        if (*target.type != TargetType::Interface)
+            totalItemsToBuild_ += target.sources->size();
 
     // Assure build paths exist.
     const auto& binariesPath  = buildPath / "binaries";
@@ -86,11 +138,52 @@ void BuildManager::build(const std::optional<CPakFile>& project,
 
     // Build all targets.
     for (const auto& target : project->targets) {
-        // TODO: link targets.
-        buildTarget(target, projectPath, buildPath, buildStatus);
+        // We do not build interfaces.
+        if (target.type == TargetType::Interface)
+            continue;
+
+        // Consolidate a target with it's interfaces.
+        BuildTarget consolidatedTarget;
+        constructConsolidatedTarget(project->targets, target, consolidatedTarget);
+        logger_->trace("\n{}", to_string(consolidatedTarget));
+
+        // Build the target.
+        buildTarget(*project, consolidatedTarget, projectPath, buildPath, buildStatus);
     }
 
     logger_->info("Finished building project '{}'", "temp name");
+}
+
+void BuildManager::resetBuildProgress() noexcept {
+    totalItemsToBuild_ = 0;
+    itemBuildProgress_ = 0;
+    sourceErrorCount_  = 0;
+}
+
+void BuildManager::logBuildProgress(std::string_view message,
+                                    std::string_view target) const noexcept {
+    const auto& percentage = (float)itemBuildProgress_ /
+                             (float)totalItemsToBuild_;
+
+    logger_->info(
+        "{:<4} {} '{}'",
+        fmt::format("{}\%", std::round(percentage * 100.0f)),
+        message.data(),
+        target.data()
+    );
+}
+
+inline void
+BuildManager::logBuildCommand(const std::vector<std::string>& arguments) const noexcept {
+    // Don't bother, this could be a very expensive operation.
+    if (logger_->level() > spdlog::level::debug)
+        return;
+
+    // Log the command.
+    std::ostringstream oss;
+    for (const auto& arg : arguments)
+        oss << arg << " ";
+    logger_->debug(oss.str());    
 }
 
 std::vector<std::string>
@@ -100,46 +193,42 @@ BuildManager::getBuildArgumentsNoSources(const BuildTarget&     target,
     std::vector<std::string> arguments;
 
     // Reserve enough space for all arguments.
-    auto size = target.defines.size() +
-                target.libraries.size() +
+    auto size = target.defines->size() +
+                target.libraries->size() +
                 2; // g++ and options
 
     if (target.search != std::nullopt) {
-        size += target.search->include.size();
-        size += target.search->library.size();
-        size += target.search->system.size();
+        size += target.search->include->size();
+        size += target.search->library->size();
+        size += target.search->system->size();
     }
 
     arguments.reserve(size);
     arguments.emplace_back("g++");
 
     // Trim whitespaces from end of options if necessary.
-    if (target.options != std::nullopt)
-        arguments.emplace_back(trim(*target.options));
+    if (target.options != std::nullopt) {
+        auto options = vectorPropertyToString(*target.options);
+             options = trim(std::move(options));
+        arguments.emplace_back(options);
+    }
 
     // Add defines.
-    for (const auto& define : target.defines)
-        arguments.emplace_back(fmt::format("-D{}", define));
+    utilities::reserveAndAppendFormatted(arguments, *target.defines, "-D {}");
 
     // Add search paths.
     if (target.search != std::nullopt) {
-        for (const auto& includePath : target.search->include)
-            arguments.emplace_back(fmt::format("-I {}", includePath));
-        // Only really needed during linking.
-        // for (const auto& libraryPath : target.search->library)
-        //     arguments.emplace_back(fmt::format("-L {}", libraryPath));
-        for (const auto& systemPath : target.search->system)
-            arguments.emplace_back(fmt::format("-isystem {}", systemPath));
+        utilities::reserveAndAppendFormatted(arguments, *target.search->include, "-I {}");
+        utilities::reserveAndAppendFormatted(arguments, *target.search->library, "-L {}");
     }
 
     // Add linking libraries.
-    for (const auto& library : target.libraries)
-        arguments.emplace_back(fmt::format("-l {}", library));
-
+    utilities::reserveAndAppendFormatted(arguments, *target.libraries, "-l {}");
     return arguments;
 }
 
-void BuildManager::buildTarget(const BuildTarget&           target,
+void BuildManager::buildTarget(const CPakFile&              project,
+                               const BuildTarget&           target,
                                const std::filesystem::path& projectPath,
                                const std::filesystem::path& buildPath,
                                      std::error_code&       buildStatus) const {
@@ -149,34 +238,26 @@ void BuildManager::buildTarget(const BuildTarget&           target,
         return;
     }
 
-    if (target.sources.empty()) {
+    if (target.sources->empty()) {
         buildStatus = make_error_code(std::errc::invalid_argument);
         return;
     }
 
     buildSources(target, projectPath, buildPath, buildStatus);
     if (buildStatus.value() != 0) {
-        logger_->error("Failed to build sources for target '{}'", target.name.c_str());
+        logger_->error("Failed to build sources for target '{}'", target.name->c_str());
         return;
     }
 
-    itemBuildProgress++;
+    itemBuildProgress_++;
     linkTarget(target, projectPath, buildPath, buildStatus);
     if (buildStatus.value() != 0) {
-        logger_->error("Failed to link target '{}'", target.name.c_str());
+        logger_->error("Failed to link target '{}'", target.name->c_str());
         return;
     }
 
     // Log source file being built.
-    const auto& percentage = (float)itemBuildProgress /
-                             (float)totalItemsToBuild;
-
-    // Because the length of the 100% string is 13.
-    logger_->info(
-        "{:<4} Built target '{}'",
-        fmt::format("{}\%", std::round(percentage * 100.0f)),
-        target.name.c_str()
-    );
+    logBuildProgress("Built target", *target.name);
 }
 
 void BuildManager::buildSources(const BuildTarget&           target,
@@ -185,7 +266,7 @@ void BuildManager::buildSources(const BuildTarget&           target,
                                       std::error_code&       buildStatus) const {
     using std::make_error_code;
     const auto& arguments = getBuildArgumentsNoSources(target, buildStatus);
-    for (const auto& source : target.sources) {
+    for (const auto& source : *target.sources) {
         const auto& sourceFile = std::filesystem::path(source);
         const auto& sourcePath = projectPath / sourceFile;
         if (!std::filesystem::exists(sourcePath)) {
@@ -198,11 +279,11 @@ void BuildManager::buildSources(const BuildTarget&           target,
         const auto& outputFile = outputPath / fmt::format("{}.o", sourceFile.filename().c_str());
         
         // Proceed to compile sources.
-        itemBuildProgress++;
+        itemBuildProgress_++;
         compileSource(arguments, sourcePath, outputFile);
     }
 
-    if (sourceErrorCount > 0) {
+    if (sourceErrorCount_ > 0) {
         buildStatus = make_error_code(std::errc::invalid_argument);
         return;
     }
@@ -221,21 +302,8 @@ void BuildManager::compileSource(const std::vector<std::string>& arguments,
     finalArguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
 
     // Log source file being built.
-    const auto& percentage = (float)itemBuildProgress /
-                             (float)totalItemsToBuild;
-
-    // Because the length of the 100% string is 13.
-    logger_->info(
-        "{:<4} Compiling source '{}'",
-        fmt::format("{}\%", std::round(percentage * 100.0f)),
-        sourcePath.c_str()
-    );
-
-    // Log the command.
-    std::ostringstream oss;
-    for (const auto& arg : finalArguments)
-        oss << arg << " ";
-    logger_->debug(oss.str());
+    logBuildProgress("Compiling ", sourcePath.c_str());
+    logBuildCommand(finalArguments);
 
     // Build the source file.
     const auto& result = executeInShell(finalArguments);
@@ -243,7 +311,7 @@ void BuildManager::compileSource(const std::vector<std::string>& arguments,
         return;
 
     // Print what happened.
-    sourceErrorCount++;
+    sourceErrorCount_++;
     logger_->error("\n{}", result.error);
     logger_->error("\n{}", result.output);
 }
@@ -254,14 +322,14 @@ void BuildManager::linkTarget(const BuildTarget&           target,
                                     std::error_code&       buildStatus) const {
     using std::make_error_code;
     std::vector<std::string> arguments;
-    arguments.reserve(target.sources.size() + 3); // sources, ld, c++ runtime, and output.
+    arguments.reserve(target.sources->size() + 3); // sources, ld, c++ runtime, and output.
     arguments.emplace_back("g++");
 
     // Add sources.
     const auto& binariesPath  = buildPath / "binaries";
     const auto& librariesPath = buildPath / "libraries";
     const auto& objectsPath   = buildPath / "objects";
-    for (const auto& source : target.sources) {
+    for (const auto& source : *target.sources) {
         const auto& sourceFile = std::filesystem::path(source);
         const auto& sourcePath = objectsPath / fmt::format("{}.o", sourceFile.filename().c_str());
         arguments.emplace_back(sourcePath.c_str());
@@ -270,33 +338,30 @@ void BuildManager::linkTarget(const BuildTarget&           target,
     // Add library search directories.
     arguments.emplace_back(fmt::format("-L {}", binariesPath.c_str()));
     arguments.emplace_back(fmt::format("-L {}", librariesPath.c_str()));
-    if (target.search.has_value()) {
-        for (const auto& directory : target.search->library)
-            arguments.emplace_back(fmt::format("-L {}", directory));
-    }
+    if (target.search.has_value())
+        utilities::reserveAndAppendFormatted(arguments, *target.search->library, "-L {}");
 
     // Add linking libraries.
-    for (const auto& library : target.libraries)
-        arguments.emplace_back(fmt::format("-l {}", library));
+    utilities::reserveAndAppendFormatted(arguments, *target.libraries, "-l {}");
 
     // Add output type and output.
     std::string targetName;
     std::string outputName;
     std::filesystem::path targetPath;
-    const auto& outputType = cpak::buildTypeName(target.type);
-    switch (target.type) {
+    const auto& outputType = cpak::buildTypeName(*target.type);
+    switch (*target.type) {
     case TargetType::Executable:
-        targetPath = binariesPath / target.name;
+        targetPath = binariesPath / *target.name;
         arguments.emplace_back(fmt::format("-o {}", targetPath.c_str()));
         break;
     case TargetType::StaticLibrary:
-        targetName = fmt::format("lib{}.a", target.name);
+        targetName = fmt::format("lib{}.a", *target.name);
         targetPath = librariesPath / targetName;
         arguments.emplace_back("-r");
         arguments.emplace_back(fmt::format("-o {}", targetPath.c_str()));
         break;
     case TargetType::DynamicLibrary:
-        targetName = fmt::format("lib{}.so", target.name);
+        targetName = fmt::format("lib{}.so", *target.name);
         targetPath = binariesPath / targetName;
         arguments.emplace_back("-shared");
         arguments.emplace_back(fmt::format("-o {}", targetPath.c_str()));
@@ -304,22 +369,8 @@ void BuildManager::linkTarget(const BuildTarget&           target,
     }
 
     // Log source file being built.
-    const auto& percentage = (float)itemBuildProgress /
-                             (float)totalItemsToBuild;
-
-    // Because the length of the 100% string is 13.
-    logger_->info(
-        "{:<4} Linking {} '{}'",
-        fmt::format("{}\%", std::round(percentage * 100.0f)),
-        outputType.c_str(),
-        targetPath.c_str()
-    );
-
-    // Log the command.
-    std::ostringstream oss;
-    for (const auto& arg : arguments)
-        oss << arg << " ";
-    logger_->debug(oss.str());
+    logBuildProgress("Linking", targetPath.c_str());
+    logBuildCommand(arguments);
 
     // Build the source file.
     const auto& result = executeInShell(arguments);

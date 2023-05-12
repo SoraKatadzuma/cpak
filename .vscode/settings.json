@@ -75,7 +75,8 @@
         "variant": "cpp",
         "complex": "cpp",
         "typeindex": "cpp",
-        "strstream": "cpp"
+        "strstream": "cpp",
+        "ranges": "cpp"
     },
     "cSpell.words": [
         "argparse",
@@ -84,6 +85,7 @@
         "gpid",
         "semv",
         "simtech",
-        "spdlog"
+        "spdlog",
+        "tparam"
     ]
 }

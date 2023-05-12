@@ -112,12 +112,16 @@ inline void validateTargetSchema(const YAML::Node& node) {
     else if (!node["type"].IsScalar())
         throw YAML::Exception(node.Mark(), "Target type must be a string.");
 
-    if (!node["sources"])
-        throw YAML::Exception(node.Mark(), "Target is missing sources.");
-    else if (!node["sources"].IsSequence())
-        throw YAML::Exception(node.Mark(), "Target sources must be a sequence.");
-    else if (node["sources"].size() == 0)
-        throw YAML::Exception(node.Mark(), "Target sources must not be empty.");
+    // Because the target could be a interface, and interfaces don't require
+    // sources, we have to defer the check for absence of sources until after
+    // we know the target type. The checks within this block are still valid
+    // for interfaces.
+    if (node["sources"]) {
+        if (!node["sources"].IsSequence())
+            throw YAML::Exception(node.Mark(), "Target sources must be a sequence.");
+        else if (node["sources"].size() == 0)
+            throw YAML::Exception(node.Mark(), "Target sources must not be empty.");
+    }
 
     // Validate optional fields if present.
     if (node["defines"] && !node["defines"].IsSequence())
@@ -132,6 +136,32 @@ inline void validateTargetSchema(const YAML::Node& node) {
     if (node["options"] && !node["options"].IsScalar())
         throw YAML::Exception(node.Mark(), "Target options must be a string.");
 }
+
+
+/// @brief  Converts the given target to a string.
+/// @param  target The target to convert to a string. 
+/// @return The string representation of the target.
+inline std::string to_string(const BuildTarget& target) noexcept {
+    std::ostringstream oss;
+    oss << *target.name << " (" << buildTypeName(*target.type) << ") {\n";
+    oss << "    Defines: " << vectorPropertyToString(target.defines, ';') << "\n";
+    oss << "    Interfaces: " << vectorPropertyToString(target.interfaces, ';') << "\n";
+    oss << "    Libraries: " << vectorPropertyToString(target.libraries, ';') << "\n";
+    oss << "    Sources: " << vectorPropertyToString(target.sources, ';') << "\n";
+    oss << "    Options: " << vectorPropertyToString(target.options); // hasn't been trimmed yet.
+
+    if (target.search != std::nullopt) {
+        oss << "    Search: {\n";
+        oss << "        Include: " << vectorPropertyToString(target.search->include, ';') << "\n";
+        oss << "        System: " << vectorPropertyToString(target.search->system, ';') << "\n";
+        oss << "        Library: " << vectorPropertyToString(target.search->library, ';') << "\n";
+        oss << "    }\n";
+    }
+
+    oss << "}";
+    return oss.str();
+}
+
 
 }
 
@@ -194,11 +224,11 @@ struct YAML::convert<cpak::BuildTarget> {
         node["sources"] = rhs.sources;
         
         // Handle optional fields.
-        if (rhs.search)     node["search"]     = rhs.search;
-        if (rhs.options)    node["options"]    = vectorPropertyToString(rhs.options);
-        if (rhs.defines)    node["defines"]    = rhs.defines;
-        if (rhs.libraries)  node["libraries"]  = rhs.libraries;
-        if (rhs.interfaces) node["interfaces"] = rhs.interfaces;
+        if (rhs.search     != std::nullopt) node["search"]     = rhs.search;
+        if (rhs.options    != std::nullopt) node["options"]    = vectorPropertyToString(rhs.options);
+        if (rhs.defines    != std::nullopt) node["defines"]    = rhs.defines;
+        if (rhs.libraries  != std::nullopt) node["libraries"]  = rhs.libraries;
+        if (rhs.interfaces != std::nullopt) node["interfaces"] = rhs.interfaces;
         return node;
     }
 
@@ -206,9 +236,15 @@ struct YAML::convert<cpak::BuildTarget> {
         using namespace cpak;
         
         validateTargetSchema(node);
-        rhs.name    = node["name"].as<RequiredProperty<std::string>>();
-        rhs.type    = node["type"].as<RequiredProperty<TargetType>>();
-        rhs.sources = node["sources"].as<VectorProperty<std::string>>();
+        rhs.name = node["name"].as<RequiredProperty<std::string>>();
+        rhs.type = node["type"].as<RequiredProperty<TargetType>>();
+        
+        // Check for sources if this isn't an interface target.
+        if (*rhs.type != TargetType::Interface) {
+            if (!node["sources"])
+                throw YAML::Exception(node.Mark(), "Target is missing sources.");
+            rhs.sources = node["sources"].as<VectorProperty<std::string>>();
+        }
 
         // Handle optional fields.
         if (node["search"])     rhs.search     = node["search"].as<OptionalProperty<SearchPaths>>();
