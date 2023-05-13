@@ -80,12 +80,15 @@
     },
     "cSpell.words": [
         "argparse",
+        "buildcmd",
         "cpak",
         "cpakfile",
         "gpid",
+        "metavar",
         "semv",
         "simtech",
         "spdlog",
+        "subparser",
         "tparam"
     ]
 }

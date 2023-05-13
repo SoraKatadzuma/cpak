@@ -1,6 +1,7 @@
 #include "application.hpp"
 #include "utilities/checksum.hpp"
 #include "utilities/logging.hpp"
+#include "utilities/stropts.hpp"
 
 std::string cpak::Application::version() noexcept {
     return VERSION.str();
@@ -55,7 +56,9 @@ std::int32_t cpak::Application::run(int argc, char** argv) {
     if (program_->is_subcommand_used("build")) {
         const auto& pathStr     = buildcmd_->get("path");
         const auto& projectPath = std::filesystem::canonical(pathStr);
-        const auto& cpakfile    = projectMgr_->load(projectPath, commandStatus);
+        
+        // Will be modified later.
+        auto cpakfile = projectMgr_->load(projectPath, commandStatus);
         if (commandStatus.value() != EXIT_SUCCESS) {
             logger_->error(fmt::format(
                 fmt::fg(fmt::terminal_color::bright_red),
@@ -63,6 +66,14 @@ std::int32_t cpak::Application::run(int argc, char** argv) {
             ));
             return EXIT_FAILURE;
         }
+
+        // Get project options from command line.
+        // Then update the project options.
+        if (buildcmd_->is_used("--define"))
+            updateOptions(*cpakfile, buildcmd_->get<std::vector<std::string>>("--define"));
+
+        // After all options are updated, interpolate them into the project.
+        interpolateOptions(*cpakfile);
 
         // Create sinks for logging, logger, and add sinks.
         const auto& loggingPath = projectPath / ".cpak" / "logs";
@@ -118,6 +129,14 @@ void cpak::Application::initProgram() {
 
 void cpak::Application::initBuildCommand() {
     buildcmd_->add_description("Builds a project given a path.");
+    buildcmd_->set_assign_chars("=:");
+
+    // Make this support multiple options.
+    buildcmd_->add_argument("--define")
+              .help("Sets a option in the project")
+              .metavar("OPTION[:value]")
+              .append();
+
     buildcmd_->add_argument("path")
               .help("Path to the project to build")
               .metavar("PATH")

@@ -1,5 +1,6 @@
 #pragma once
 #include "property.hpp"
+#include "option.hpp"
 
 namespace cpak {
 
@@ -135,6 +136,29 @@ inline void validateTargetSchema(const YAML::Node& node) {
 
     if (node["options"] && !node["options"].IsScalar())
         throw YAML::Exception(node.Mark(), "Target options must be a string.");
+}
+
+
+/// @brief   Interpolates the given options into the given target.
+/// @param   target The target to interpolate the options into.
+/// @param   options The options to interpolate into the target.
+/// @remarks This works by searching the target for substrings which match one
+///          of the options, and replacing the substring with the value of the
+///          option. This is done for each option in the given vector.
+inline void interpolateOptions(BuildTarget& target, const std::vector<BuildOption>& options) {
+    // TODO: support interpolation of the target type.
+    interpolateOptions(*target.name, options);
+    for (auto&& val : *target.defines)    interpolateOptions(val, options);
+    for (auto&& val : *target.interfaces) interpolateOptions(val, options);
+    for (auto&& val : *target.libraries)  interpolateOptions(val, options);
+    for (auto&& val : *target.sources)    interpolateOptions(val, options);
+    for (auto&& val : *target.options)    interpolateOptions(val, options);
+
+    if (target.search != std::nullopt) {
+        for (auto&& val: *target.search->include) interpolateOptions(val, options);
+        for (auto&& val: *target.search->system)  interpolateOptions(val, options);
+        for (auto&& val: *target.search->library) interpolateOptions(val, options);
+    }
 }
 
 

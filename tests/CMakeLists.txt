@@ -35,6 +35,7 @@ endmacro()
 # Create the tests.
 create_test(checksum        checksum_tests.cpp)
 create_test(cpakfile        cpakfile_tests.cpp)
+create_test(option          option_tests.cpp)
 create_test(project         project_tests.cpp)
 create_test(target          target_tests.cpp)
 create_test(build_pipeline  build_pipeline_tests.cpp)
