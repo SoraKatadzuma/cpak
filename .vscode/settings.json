@@ -83,6 +83,7 @@
         "buildcmd",
         "cpak",
         "cpakfile",
+        "cpakid",
         "gpid",
         "metavar",
         "semv",

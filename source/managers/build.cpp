@@ -1,25 +1,8 @@
 #include "build.hpp"
 #include "../utilities/logging.hpp"
+#include "../utilities/stropts.hpp"
 
 using namespace cpak;
-
-constexpr static std::string_view kWhitespace = " \t\n\r\f\v";
-
-inline static std::string ltrim(std::string input) {
-    // Erase all leading whitespaces.
-    // Much more readable than the previous version.
-    return input.substr(input.find_first_not_of(kWhitespace));
-}
-
-inline static std::string rtrim(std::string input) {
-    // Erase all trailing whitespaces.
-    // Much more readable than the previous version.
-    return input.substr(0, input.find_last_not_of(kWhitespace) + 1);
-}
-
-inline static std::string trim(std::string input) {
-    return ltrim(rtrim(std::move(input)));
-}
 
 inline static void
 copyInterfacePropertiesToTarget(const BuildTarget& interface,
@@ -209,7 +192,7 @@ BuildManager::getBuildArgumentsNoSources(const BuildTarget&     target,
     // Trim whitespaces from end of options if necessary.
     if (target.options != std::nullopt) {
         auto options = vectorPropertyToString(*target.options);
-             options = trim(std::move(options));
+             options = utilities::trim(std::move(options));
         arguments.emplace_back(options);
     }
 

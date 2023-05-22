@@ -3,6 +3,8 @@ add_executable(
     cpak
     application.cpp
     entry.cpp
+    errorcode.cpp
+    pipeline.cpp
     managers/build.cpp
     managers/project.cpp
 )

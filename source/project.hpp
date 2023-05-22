@@ -1,5 +1,5 @@
 #pragma once
-#include "version.hpp"
+#include "identity.hpp"
 #include "utilities/noncopyable.hpp"
 
 namespace cpak {
@@ -9,22 +9,13 @@ namespace cpak {
 /// @details This struct stores the project information for a CPak project.
 ///          It is an extension of a project identity, containing the paths
 ///          to the project and build directories, as well as other metadata.
-struct ProjectInfo {
-    // Provided by project manager after loading.
-    // std::filesystem::path projectPath;
-    // std::filesystem::path buildPath;
-
+struct ProjectInfo : public Identity {
     // Optional fields.
     std::vector<std::string> authors;
     std::optional<std::string> description;
     std::optional<std::string> license;
     std::optional<std::string> homePage;
     std::optional<std::string> issuesPage;
-
-    // Required fields.
-    std::string name;
-    std::string gpid;
-    version     semv;
 };
 
 

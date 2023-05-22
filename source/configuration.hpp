@@ -1,4 +1,5 @@
 #pragma once
+#include "common.hpp"
 
 namespace cpak {
 
@@ -13,3 +14,17 @@ struct Configuration {
 
 
 }
+
+
+
+template<>
+struct YAML::convert<cpak::Configuration> {
+    static Node encode(const cpak::Configuration& rhs) {
+        Node node;
+        return node;
+    }
+
+    static bool decode(const Node& node, cpak::Configuration& rhs) {
+        return true;
+    }
+};

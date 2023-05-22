@@ -22,8 +22,8 @@ authors:
     const auto& yaml    = YAML::Load(yamlStr);
     const auto& project = yaml.as<cpak::ProjectInfo>();
 
-    EXPECT_EQ(project.name, "sample");
-    EXPECT_EQ(project.gpid, "simtech");
+    EXPECT_EQ(*project.name, "sample");
+    EXPECT_EQ(*project.gpid, "simtech");
     EXPECT_EQ(project.semv, semver::version::parse("1.0.0"));
     EXPECT_TRUE(project.description.has_value());
     EXPECT_EQ(project.description.value(), "This is a sample project.");

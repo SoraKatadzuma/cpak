@@ -1,5 +1,7 @@
 #pragma once
+#include "dependency.hpp"
 #include "project.hpp"
+#include "repository.hpp"
 #include "target.hpp"
 #include "utilities/stropts.hpp"
 
@@ -12,8 +14,40 @@ namespace cpak {
 struct CPakFile {
     std::vector<BuildTarget> targets;
     std::vector<BuildOption> options;
+    std::vector<Repository>  repositories;
+    std::vector<Dependency>  dependencies;
 
     ProjectInfo project;
+
+    // Not to be serialized.
+    // Used during the build process.
+    std::filesystem::path projectPath;
+    std::filesystem::path buildPath;
+
+public:
+    /// @brief  Gets the logging path for the builds of this project.
+    /// @return The logging path for the builds of this project.
+    inline std::filesystem::path buildLoggingPath() const noexcept {
+        return buildPath / "logs";
+    }
+
+    /// @brief  Gets the path to the binaries build directory for this project.
+    /// @return The path to the binaries build directory for this project.
+    inline std::filesystem::path binariesBuildPath() const noexcept {
+        return buildPath / "binaries";
+    }
+
+    /// @brief  Gets the path to the libraries build directory for this project.
+    /// @return The path to the libraries build directory for this project.
+    inline std::filesystem::path librariesBuildPath() const noexcept {
+        return buildPath / "libraries";
+    }
+
+    /// @brief  Gets the path to the objects build directory for this project.
+    /// @return The path to the objects build directory for this project.
+    inline std::filesystem::path objectsBuildPath() const noexcept {
+        return buildPath / "objects";
+    }
 };
 
 
@@ -36,55 +70,12 @@ inline void validateCPakFileSchema(const YAML::Node& node) {
 
     if (node["options"] && !node["options"].IsSequence())
         throw YAML::Exception(node.Mark(), "CPakFile options must be a sequence.");
-}
 
+    if (node["repositories"] && !node["repositories"].IsSequence())
+        throw YAML::Exception(node.Mark(), "CPakFile repositories must be a sequence.");
 
-/// @brief Interpolates the given options with the given project.
-/// @param project The project to interpolate.
-inline void interpolateOptions(CPakFile& project) noexcept {
-    for (auto& target : project.targets)
-        interpolateOptions(target, project.options);
-}
-
-
-/// @brief Updates the given project options with the given options.
-/// @param project The project to update.
-/// @param options The options to update the project with.
-inline void updateOptions(CPakFile&                 project,
-                    const std::vector<std::string>& options) noexcept {
-    for (auto&& option : options) {
-        auto [optionName, optionValue] =
-            utilities::splitString(option, ":");
-
-        auto buildOption = std::find_if(
-            project.options.begin(),
-            project.options.end(),
-            [&optionName](const auto& option) {
-                return option.name == optionName;
-            }
-        );
-
-        std::string value = optionValue;
-        if (optionValue.empty()) {
-            value = optionName[0] != '!'
-                ? std::string("true")
-                : std::string("false");
-            
-            // Strip the ! from the option name.
-            optionName.erase(0, 1);
-        }
-
-        if (buildOption != project.options.end()) {
-            buildOption->value = optionValue;
-            continue;
-        }
-
-        // Create new option.
-        project.options.emplace_back(BuildOption {
-            .name  = optionName,
-            .value = optionValue,
-        });
-    }
+    if (node["dependencies"] && !node["dependencies"].IsSequence())
+        throw YAML::Exception(node.Mark(), "CPakFile dependencies must be a sequence.");
 }
 
 
@@ -105,6 +96,16 @@ struct YAML::convert<cpak::CPakFile> {
                 node["options"].push_back(option);
         }
 
+        if (!rhs.repositories.empty()) {
+            for (const auto& repository : rhs.repositories)
+                node["repositories"].push_back(repository);
+        }
+
+        if (!rhs.dependencies.empty()) {
+            for (const auto& dependency : rhs.dependencies)
+                node["dependencies"].push_back(dependency);
+        }
+
         return node;
     }
 
@@ -119,6 +120,16 @@ struct YAML::convert<cpak::CPakFile> {
         if (node["options"]) {
             for (const auto& option : node["options"])
                 rhs.options.push_back(option.as<cpak::BuildOption>());
+        }
+
+        if (node["repositories"]) {
+            for (const auto& repository : node["repositories"])
+                rhs.repositories.push_back(repository.as<cpak::Repository>());
+        }
+
+        if (node["dependencies"]) {
+            for (const auto& dependency : node["dependencies"])
+                rhs.dependencies.push_back(dependency.as<cpak::Dependency>());
         }
 
         return true;
