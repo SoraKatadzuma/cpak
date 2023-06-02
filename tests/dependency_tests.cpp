@@ -25,6 +25,7 @@ remote:
     EXPECT_EQ(*dependency.remote->address, "https://gitlab.com");
     EXPECT_EQ(*dependency.remote->username, "johndoe");
     EXPECT_EQ(*dependency.remote->email, "johndoe@gmail.com");
+    EXPECT_EQ(*dependency.remote->password, "$SECRET_PASSWORD");
 }
 
 TEST(DependencyTests, canDecodeDependencyWithoutRepository) {

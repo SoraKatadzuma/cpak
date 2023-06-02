@@ -100,7 +100,7 @@ struct Property {
     /// @throws std::runtime_error if this property is required and has no value.
     TContained* operator->() {
         // Make sure we're not accessing a required property which has no value.
-        assert((required && !value.has_value()) && "Required property has no value.");
+        assert(!(required && !value_.has_value()) && "Required property has no value.");
         return value_.operator->();
     }
 
@@ -115,7 +115,7 @@ struct Property {
     /// @throws std::runtime_error if this property is required and has no value.
     const TContained* operator->() const {
         // Make sure we're not accessing a required property which has no value.
-        assert((required && !value.has_value()) && "Required property has no value.");
+        assert(!(required && !value_.has_value()) && "Required property has no value.");
         return value_.operator->();
     }
 

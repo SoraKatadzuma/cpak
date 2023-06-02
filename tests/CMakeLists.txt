@@ -1,8 +1,10 @@
 # Create library for tests to link against.
 add_library(
     cpaktesting STATIC
-    ${CMAKE_SOURCE_DIR}/source/managers/build.cpp
-    ${CMAKE_SOURCE_DIR}/source/managers/project.cpp
+    ${CMAKE_SOURCE_DIR}/source/application.cpp
+    ${CMAKE_SOURCE_DIR}/source/errorcode.cpp
+    ${CMAKE_SOURCE_DIR}/source/management.cpp
+    ${CMAKE_SOURCE_DIR}/source/pipeline.cpp
 )
 
 target_include_directories(cpaktesting PUBLIC ${CMAKE_SOURCE_DIR}/source)
@@ -33,12 +35,11 @@ macro(create_test TESTNAME TESTFILE)
 endmacro()
 
 # Create the tests.
-create_test(checksum        checksum_tests.cpp)
-create_test(cpakfile        cpakfile_tests.cpp)
-create_test(dependency      dependency_tests.cpp)
-create_test(option          option_tests.cpp)
-create_test(project         project_tests.cpp)
-create_test(repository      repository_tests.cpp)
-create_test(target          target_tests.cpp)
-create_test(build_pipeline  build_pipeline_tests.cpp)
-create_test(project_manager project_manager_tests.cpp)
+create_test(checksum   checksum_tests.cpp)
+create_test(cpakfile   cpakfile_tests.cpp)
+create_test(dependency dependency_tests.cpp)
+create_test(management management_tests.cpp)
+create_test(option     option_tests.cpp)
+create_test(project    project_tests.cpp)
+create_test(repository repository_tests.cpp)
+create_test(target     target_tests.cpp)

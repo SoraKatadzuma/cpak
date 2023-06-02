@@ -10,6 +10,9 @@ struct CPakGenericErrorCategory : public std::error_category {
         switch (code) {
         case cpak::errc::success: return cpak::errc::kSuccessMessage.data();
         case cpak::errc::failure: return cpak::errc::kFailureMessage.data();
+        case cpak::errc::pathDoesNotExist: return cpak::errc::kPathDoesNotExistMessage.data();
+        case cpak::errc::noCPakFileAtPath: return cpak::errc::kNoCPakFileAtPathMessage.data();
+        case cpak::errc::invalidCPakFile: return cpak::errc::kInvalidCPakFileMessage.data();
         default: return "Unknown error";
         }
     }

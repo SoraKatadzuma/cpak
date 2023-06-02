@@ -19,19 +19,28 @@ enum values : std::uint16_t {
 
     // Build error codes.
     dependencyNotFound,
+    gitCloneFailed,
+    interfaceNotFound,
+    interfaceNameCollision,
 
     // When all else fails, use this, who knows what the problem could be..
     unknown = std::numeric_limits<std::uint16_t>::max(),
 
     // Define beginning and end of generic range.
-    generic_begin = EXIT_SUCCESS,
+    generic_begin = success,
     generic_end   = invalidCPakFile,
+
+    // Define beginning and end of build range.
+    build_begin = dependencyNotFound,
+    build_end   = interfaceNameCollision,
 };
 
 
 constexpr std::string_view kSuccessMessage = "Success"; // Generic success.
 constexpr std::string_view kFailureMessage = "Failure"; // Generic failure.
-
+constexpr std::string_view kPathDoesNotExistMessage = "Path does not exist";
+constexpr std::string_view kNoCPakFileAtPathMessage = "No CPakfile at path";
+constexpr std::string_view kInvalidCPakFileMessage = "Invalid CPakfile";
 
 }
 

@@ -37,24 +37,24 @@ struct BuildTarget {
     VectorProperty<std::string> sources;
     VectorProperty<std::string> options;
     OptionalProperty<SearchPaths> search;
-    RequiredProperty<std::string> name;
-    RequiredProperty<TargetType> type;
+    RequiredProperty<std::string> name{ "INVALID" };
+    RequiredProperty<TargetType> type{ TargetType::Undefined };
 };
 
 
 /// @brief  Builds a string representation of the target type.
 /// @param  type The target type to build a string representation of.
 /// @return The string that represents the target type.
-inline std::string buildTypeName(cpak::TargetType type) {
+inline std::string buildTypeName(TargetType type) {
     switch (type) {
-    case cpak::TargetType::Undefined:      return "Undefined";
-    case cpak::TargetType::Executable:     return "executable";
-    case cpak::TargetType::StaticLibrary:  return "static library";
-    case cpak::TargetType::DynamicLibrary: return "dynamic library";
-    case cpak::TargetType::Interface:      return "interface";
+    case TargetType::Undefined:      return "Undefined";
+    case TargetType::Executable:     return "executable";
+    case TargetType::StaticLibrary:  return "static library";
+    case TargetType::DynamicLibrary: return "dynamic library";
+    case TargetType::Interface:      return "interface";
     }
 
-    return "Undefined";
+    return "INVALID";
 }
 
 

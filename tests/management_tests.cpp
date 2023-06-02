@@ -1,4 +1,5 @@
-#include "managers/project.hpp"
+#include "errorcode.hpp"
+#include "management.hpp"
 #include "gtest/gtest.h"
 
 
@@ -69,11 +70,10 @@ targets:
 /////////////////////////////////////////////////////////////////////////////
 TEST_F(ProjectManagerTestFixture, canLoadProject) {
     // Try to load project.
-    std::error_code loadStatus;
-    const auto& projectManager = cpak::ProjectManager(logger_);
-    const auto& cpakfilePtr    = projectManager.load(pathWithGoodCPakFile_, loadStatus);
-    ASSERT_EQ(loadStatus.value(), 0) << loadStatus.message();
-    EXPECT_TRUE(cpakfilePtr != std::nullopt);
+    const auto [optCPakFile, result] =
+        cpak::management::loadCPakFile(pathWithGoodCPakFile_);
+    ASSERT_EQ(result.value(), 0) << result.message();
+    EXPECT_TRUE(optCPakFile != std::nullopt);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -81,31 +81,28 @@ TEST_F(ProjectManagerTestFixture, canLoadProject) {
 /////////////////////////////////////////////////////////////////////////////
 TEST_F(ProjectManagerTestFixture, cannotLoadNonexistentProject) {
     // Try to load project.
-    std::error_code loadStatus;
-    const auto& projectManager = cpak::ProjectManager(logger_);
-    const auto& cpakfilePtr    = projectManager.load("/nonexistent/path", loadStatus);
+    const auto [optCPakFile, result] =
+        cpak::management::loadCPakFile("/nonexistent/path");
 
-    EXPECT_EQ(loadStatus.value(), (int)cpak::ProjectManager::LoadStatus::NoProjectDirectory);
-    EXPECT_EQ(loadStatus.message(), cpak::ProjectManager::kNoProjectDirectoryMessage);
-    EXPECT_TRUE(cpakfilePtr == std::nullopt);
+    EXPECT_EQ(result.value(), (int)cpak::errc::pathDoesNotExist);
+    EXPECT_EQ(result.message(), cpak::errc::kPathDoesNotExistMessage);
+    EXPECT_TRUE(optCPakFile == std::nullopt);
 }
 
 TEST_F(ProjectManagerTestFixture, cannotLoadProjectWithoutCPakFile) {
     // Try to load project.
-    std::error_code loadStatus;
-    const auto& projectManager = cpak::ProjectManager(logger_);
-    const auto& cpakfilePtr    = projectManager.load(pathWithoutCPakfile_, loadStatus);
-    EXPECT_EQ(loadStatus.value(), (int)cpak::ProjectManager::LoadStatus::NoCPakFileInProject);
-    EXPECT_EQ(loadStatus.message(), cpak::ProjectManager::kNoCPakFileInProjectMessage);
-    EXPECT_TRUE(cpakfilePtr == std::nullopt);
+    const auto [optCPakFile, result] =
+        cpak::management::loadCPakFile(pathWithoutCPakfile_);
+    EXPECT_EQ(result.value(), (int)cpak::errc::noCPakFileAtPath);
+    EXPECT_EQ(result.message(), cpak::errc::kNoCPakFileAtPathMessage);
+    EXPECT_TRUE(optCPakFile == std::nullopt);
 }
 
 TEST_F(ProjectManagerTestFixture, cannotLoadProjectWithInvalidCPakFile) {
     // Try to load project.
-    std::error_code loadStatus;
-    const auto& projectManager = cpak::ProjectManager(logger_);
-    const auto& cpakfilePtr    = projectManager.load(pathWithBadCPakFile_, loadStatus);
-    EXPECT_EQ(loadStatus.value(), (int)cpak::ProjectManager::LoadStatus::InvalidCPakFile);
-    EXPECT_EQ(loadStatus.message(), cpak::ProjectManager::kInvalidCPakFileMessage);
-    EXPECT_TRUE(cpakfilePtr == std::nullopt);
+    const auto [optCPakFile, result] =
+        cpak::management::loadCPakFile(pathWithBadCPakFile_);
+    EXPECT_EQ(result.value(), (int)cpak::errc::invalidCPakFile);
+    EXPECT_EQ(result.message(), cpak::errc::kInvalidCPakFileMessage);
+    EXPECT_TRUE(optCPakFile == std::nullopt);
 }

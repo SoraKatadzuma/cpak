@@ -4,9 +4,8 @@ add_executable(
     application.cpp
     entry.cpp
     errorcode.cpp
+    management.cpp
     pipeline.cpp
-    managers/build.cpp
-    managers/project.cpp
 )
 
 target_compile_options(cpak PRIVATE -g)
