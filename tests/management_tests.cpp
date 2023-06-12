@@ -4,17 +4,21 @@
 
 
 struct ProjectManagerTestFixture : public ::testing::Test {
-protected:
-    static void SetUpTestCase() {
+    protected:
+    static void
+    SetUpTestCase() {
         logger_ = spdlog::stdout_color_mt("cpak");
         logger_->set_level(spdlog::level::debug);
 
-        pathWithGoodCPakFile_ = std::filesystem::temp_directory_path() / ".goodcpaktesting";
-        pathWithBadCPakFile_  = std::filesystem::temp_directory_path() / ".badcpaktesting";
-        pathWithoutCPakfile_  = std::filesystem::temp_directory_path() / ".emptycpaktesting";
-        badCPakFilePath_      = pathWithBadCPakFile_  / "CPakFile";
-        goodCPakFilePath_     = pathWithGoodCPakFile_ / "CPakFile";
-        
+        pathWithGoodCPakFile_ =
+            std::filesystem::temp_directory_path() / ".goodcpaktesting";
+        pathWithBadCPakFile_ =
+            std::filesystem::temp_directory_path() / ".badcpaktesting";
+        pathWithoutCPakfile_ =
+            std::filesystem::temp_directory_path() / ".emptycpaktesting";
+        badCPakFilePath_  = pathWithBadCPakFile_ / "CPakFile";
+        goodCPakFilePath_ = pathWithGoodCPakFile_ / "CPakFile";
+
         const auto& cpakfileContents = R"(
 project:
   name: sample
@@ -30,26 +34,25 @@ targets:
     - source/main.cpp)";
 
         // Create temporary project directories for test.
-        subprocess::check_output(fmt::format(
-            "mkdir {}; echo 'targets: []' > {}",
-            pathWithBadCPakFile_.string(),
-            badCPakFilePath_.string()
-        ), subprocess::shell{true});
+        subprocess::check_output(
+            fmt::format("mkdir {}; echo 'targets: []' > {}",
+                        pathWithBadCPakFile_.string(),
+                        badCPakFilePath_.string()),
+            subprocess::shell{ true });
 
-        subprocess::check_output(fmt::format(
-            "mkdir {}; echo '{}' > {}",
-            pathWithGoodCPakFile_.string(),
-            cpakfileContents,
-            goodCPakFilePath_.string()
-        ), subprocess::shell{true});
+        subprocess::check_output(fmt::format("mkdir {}; echo '{}' > {}",
+                                             pathWithGoodCPakFile_.string(),
+                                             cpakfileContents,
+                                             goodCPakFilePath_.string()),
+                                 subprocess::shell{ true });
 
-        subprocess::check_output(fmt::format(
-            "mkdir {}",
-            pathWithoutCPakfile_.string()
-        ), subprocess::shell{true});
+        subprocess::check_output(
+            fmt::format("mkdir {}", pathWithoutCPakfile_.string()),
+            subprocess::shell{ true });
     }
 
-    static void TearDownTestCase() {
+    static void
+    TearDownTestCase() {
         // Clean up temporary project directory.
         std::filesystem::remove_all(pathWithoutCPakfile_);
         std::filesystem::remove_all(pathWithBadCPakFile_);

@@ -2,9 +2,4 @@
 #include "common.hpp"
 
 
-namespace cpak {
-
-
-
-
-}
+namespace cpak {}

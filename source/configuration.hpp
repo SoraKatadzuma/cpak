@@ -13,18 +13,19 @@ struct Configuration {
 };
 
 
-}
-
+} // namespace cpak
 
 
 template<>
 struct YAML::convert<cpak::Configuration> {
-    static Node encode(const cpak::Configuration& rhs) {
+    static Node
+    encode(const cpak::Configuration& rhs) {
         Node node;
         return node;
     }
 
-    static bool decode(const Node& node, cpak::Configuration& rhs) {
+    static bool
+    decode(const Node& node, cpak::Configuration& rhs) {
         return true;
     }
 };

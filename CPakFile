@@ -1,0 +1,128 @@
+project:
+  name: cpak
+  gpid: SoraKatadzuma
+  semv: 1.0.0-alpha+dev
+  desc: >
+    Compile and Package (CPak) is a build tool with an
+    emphasis on configuration as code and extensibility.
+  home: https://github.com/SoraKatadzuma/cpak
+  issues: https://github.com/SoraKatadzuma/cpak/issues
+  license: MIT
+  authors:
+  - John Christman dungeonsandanime@gmail.com
+
+# All dependencies are forked to include their own CPakFiles.
+dependencies:
+- SoraKatadzuma/argparse@1.0.0
+- SoraKatadzuma/cpp-semver@1.0.0
+- SoraKatadzuma/cpp-subprocess@1.0.0
+- SoraKatadzuma/googletest@1.0.0
+- SoraKatadzuma/spdlog@1.0.0
+- SoraKatadzuma/yaml-cpp@1.0.0
+
+targets:
+- name: cpaktesting
+  type: static library
+  interfaces:
+  - "argparse::argparse"
+  - "cpp-semver::cpp-semver"
+  - "cpp-subprocess::cpp-subprocess"
+  - "gtest::gtest"
+  - "spdlog::spdlog"
+  - "yaml-cpp::yaml-cpp"
+  libraries:
+  - stdc++fs
+  sources:
+  - source/application.cpp
+  - source/errorcode.cpp
+  - source/management.cpp
+  - source/pipeline.cpp
+
+- name: checksum_tests
+  type: executable
+  libraries:
+  - cpaktesting
+  sources:
+  - tests/checksum_tests.cpp
+
+- name: cpakfile_tests
+  type: executable
+  libraries:
+  - cpaktesting
+  sources:
+  - tests/cpakfile_tests.cpp
+
+- name: dependency_tests
+  type: executable
+  libraries:
+  - cpaktesting
+  sources:
+  - tests/dependency_tests.cpp
+
+- name: management_tests
+  type: executable
+  libraries:
+  - cpaktesting
+  sources:
+  - tests/management_tests.cpp
+
+- name: option_tests
+  type: executable
+  libraries:
+  - cpaktesting
+  sources:
+  - tests/option_tests.cpp
+
+- name: project_tests
+  type: executable
+  libraries:
+  - cpaktesting
+  sources:
+  - tests/project_tests.cpp
+
+- name: repository_tests
+  type: executable
+  libraries:
+  - cpaktesting
+  sources:
+  - tests/repository_tests.cpp
+
+- name: target_tests
+  type: executable
+  libraries:
+  - cpaktesting
+  sources:
+  - tests/target_tests.cpp
+
+- name: cpak
+  type: executable
+  interfaces:
+  - "argparse::argparse"
+  - "cpp-semver::cpp-semver"
+  - "cpp-subprocess::cpp-subprocess"
+  - "spdlog::spdlog"
+  - "yaml-cpp::yaml-cpp"
+  options: >
+    -g -Wall -Wextra -Wpedantic -Werror
+  sources:
+  - source/application.cpp
+  - source/entry.cpp
+  - source/errorcode.cpp
+  - source/management.cpp
+  - source/pipeline.cpp
+
+tests:
+- checksum_tests
+- cpakfile_tests
+- dependency_tests
+- management_tests
+- option_tests
+- project_tests
+- repository_tests
+- target_tests
+
+install:
+  targets:
+  # Assumes 755 permissions.
+  - src: cpak
+    dst: bin

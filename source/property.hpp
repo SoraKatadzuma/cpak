@@ -30,7 +30,7 @@ struct Property {
     /// @param value The value to copy into this property.
     Property(const TContained& value)
         : value_(value) {}
-    
+
     /// @brief Creates a new \c Property from the given value.
     /// @param value The value to move into this property.
     Property(TContained&& value)
@@ -39,7 +39,8 @@ struct Property {
     /// @brief  Assigns the given \c Property to this \c Property.
     /// @param  rhs The property to assign the value from.
     /// @return The assigned property.
-    Property& operator=(const Property& rhs) {
+    Property&
+    operator=(const Property& rhs) {
         value_ = rhs.value_;
         return *this;
     }
@@ -47,14 +48,16 @@ struct Property {
     /// @brief  Assigns the given \c Property to this \c Property.
     /// @param  rhs The property to assign the value from.
     /// @return The assigned property.
-    Property& operator=(Property&& rhs) {
+    Property&
+    operator=(Property&& rhs) {
         value_ = std::move(rhs.value_);
         return *this;
     }
 
     /// @brief  Assigns nothing to this \c Property.
-    /// @return 
-    Property& operator=(std::nullopt_t) {
+    /// @return
+    Property&
+    operator=(std::nullopt_t) {
         // Make sure we're not assigning nothing to a property which requires
         // a value to be present. This could cause problems for serialization.
         assert(required && "Cannot assign std::nullopt to required property.");
@@ -66,69 +69,81 @@ struct Property {
     /// @brief  Compares this \c Property to the given \c Property.
     /// @param  rhs The property to compare to.
     /// @return \c true if the properties are equal, \c false otherwise.
-    bool operator==(const Property& rhs) const noexcept {
+    bool
+    operator==(const Property& rhs) const noexcept {
         return value_ == rhs.value_;
     }
 
     /// @brief  Compares this \c Property to a null optional.
     /// @return \c true if this \c Property has no value, \c false otherwise.
-    bool operator==(std::nullopt_t) const noexcept {
+    bool
+    operator==(std::nullopt_t) const noexcept {
         return !value_.has_value();
     }
 
     /// @brief  Compares this \c Property to the given \c Property.
     /// @param  rhs The property to compare to.
     /// @return \c true if the properties are not equal, \c false otherwise.
-    bool operator!=(const Property& rhs) const noexcept {
+    bool
+    operator!=(const Property& rhs) const noexcept {
         return !(value_ == rhs.value_);
     }
 
     /// @brief  Compares this \c Property to a null optional.
     /// @return \c true if this \c Property has a value, \c false otherwise.
-    bool operator!=(std::nullopt_t) const noexcept {
+    bool
+    operator!=(std::nullopt_t) const noexcept {
         return value_.has_value();
     }
 
     /// @brief  Gets the value of this \c Property.
     /// @return The value of this \c Property.
-    TContained& operator*() noexcept {
+    TContained&
+    operator*() noexcept {
         return value_.value();
     }
 
     /// @brief  Provides access to the value of this \c Property.
     /// @return A reference to the value of this \c Property.
-    /// @throws std::runtime_error if this property is required and has no value.
-    TContained* operator->() {
+    /// @throws std::runtime_error if this property is required and has no
+    /// value.
+    TContained*
+    operator->() {
         // Make sure we're not accessing a required property which has no value.
-        assert(!(required && !value_.has_value()) && "Required property has no value.");
+        assert(!(required && !value_.has_value()) &&
+               "Required property has no value.");
         return value_.operator->();
     }
 
     /// @brief  Gets the value of this \c Property.
     /// @return The value of this \c Property.
-    const TContained& operator*() const noexcept {
+    const TContained&
+    operator*() const noexcept {
         return value_.value();
     }
 
     /// @brief  Provides access to the value of this \c Property.
     /// @return A reference to the value of this \c Property.
-    /// @throws std::runtime_error if this property is required and has no value.
-    const TContained* operator->() const {
+    /// @throws std::runtime_error if this property is required and has no
+    /// value.
+    const TContained*
+    operator->() const {
         // Make sure we're not accessing a required property which has no value.
-        assert(!(required && !value_.has_value()) && "Required property has no value.");
+        assert(!(required && !value_.has_value()) &&
+               "Required property has no value.");
         return value_.operator->();
     }
 
     /// @brief  Checks whether or not this \c Property has a value.
     /// @return \c true if this \c Property has a value, \c false otherwise.
-    bool has_value() const noexcept {
+    bool
+    has_value() const noexcept {
         return value_.has_value();
     }
 
-private:
+    private:
     std::optional<TContained> value_;
 };
-
 
 
 /// @brief   Specialization for Properties which store a vector of values.
@@ -167,7 +182,8 @@ struct Property<std::vector<TContained>, false> {
     /// @brief  Assigns the given \c Property to this \c Property.
     /// @param  rhs The property to assign values from.
     /// @return The assigned property.
-    Property& operator=(const Property& rhs) {
+    Property&
+    operator=(const Property& rhs) {
         value_ = rhs.value_;
         return *this;
     }
@@ -175,7 +191,8 @@ struct Property<std::vector<TContained>, false> {
     /// @brief  Assigns the given \c Property to this \c Property.
     /// @param  rhs The property to assign values from.
     /// @return The assigned property.
-    Property& operator=(Property&& rhs) {
+    Property&
+    operator=(Property&& rhs) {
         value_ = std::move(rhs.value_);
         return *this;
     }
@@ -184,7 +201,8 @@ struct Property<std::vector<TContained>, false> {
     /// @return  The assigned property.
     /// @remarks This will clear the property of all values, just like it would
     ///          for the single value 'optional' property.
-    Property& operator=(std::nullopt_t) {
+    Property&
+    operator=(std::nullopt_t) {
         value_.clear();
         return *this;
     }
@@ -192,66 +210,73 @@ struct Property<std::vector<TContained>, false> {
     /// @brief  Compares this \c Property to the given \c Property.
     /// @param  rhs The property to compare to.
     /// @return \c true if the properties are equal, \c false otherwise.
-    bool operator==(const Property& rhs) const noexcept {
+    bool
+    operator==(const Property& rhs) const noexcept {
         return value_ == rhs.value_;
     }
 
     /// @brief  Compares this \c Property to a null optional.
     /// @return \c true if this \c Property has no value, \c false otherwise.
-    bool operator==(std::nullopt_t) const noexcept {
+    bool
+    operator==(std::nullopt_t) const noexcept {
         return !value_.has_value();
     }
 
     /// @brief  Compares this \c Property to the given \c Property.
     /// @param  rhs The property to compare to.
     /// @return \c true if the properties are not equal, \c false otherwise.
-    bool operator!=(const Property& rhs) const noexcept {
+    bool
+    operator!=(const Property& rhs) const noexcept {
         return !(*this == rhs);
     }
 
     /// @brief  Compares this \c Property to a null optional.
     /// @return \c true if this \c Property has a value, \c false otherwise.
-    bool operator!=(std::nullopt_t) const noexcept {
+    bool
+    operator!=(std::nullopt_t) const noexcept {
         return value_.size() > 0;
     }
 
     /// @brief  Gets the value of this \c Property.
     /// @return The value of this \c Property.
-    std::vector<TContained>& operator*() noexcept {
+    std::vector<TContained>&
+    operator*() noexcept {
         return value_;
     }
 
     /// @brief  Provides access to the value of this \c Property.
     /// @return The value of this \c Property.
-    std::vector<TContained>* operator->() noexcept {
+    std::vector<TContained>*
+    operator->() noexcept {
         return &value_;
     }
 
     /// @brief  Gets the value of this \c Property.
     /// @return The value of this \c Property.
-    const std::vector<TContained>& operator*() const noexcept {
+    const std::vector<TContained>&
+    operator*() const noexcept {
         return value_;
     }
 
     /// @brief  Provides access to the value of this \c Property.
     /// @return The value of this \c Property.
-    const std::vector<TContained>* operator->() const noexcept {
+    const std::vector<TContained>*
+    operator->() const noexcept {
         return &value_;
     }
 
     /// @brief   Pipes the given \c Property into this \c Property.
     /// @param   rhs The property to pipe into this one.
     /// @return  Th newly created property.
-    Property operator|(const Property& rhs) noexcept {
+    Property
+    operator|(const Property& rhs) noexcept {
         Property result = *this;
-        std::copy_if(
-            rhs.value_.begin(),
-            rhs.value_.end(),
-            std::back_inserter(result.value_),
-            [this](const auto& value) {
-                return std::find(value_.begin(), value_.end(), value) == value_.end();
-            }
-        );
+        std::copy_if(rhs.value_.begin(), rhs.value_.end(),
+                     std::back_inserter(result.value_),
+                     [this](const auto& value) {
+                         return std::find(value_.begin(), value_.end(),
+                                          value) == value_.end();
+                     });
 
         return result;
     }
@@ -263,26 +288,25 @@ struct Property<std::vector<TContained>, false> {
     ///          this property. It's treated like a set to prevent duplicates.
     ///          This operation is very specific to the way that \c BuildTargets
     ///          will be used.
-    Property& operator|=(const Property& rhs) noexcept {
-        std::copy_if(
-            rhs.value_.begin(),
-            rhs.value_.end(),
-            std::back_inserter(value_),
-            [this](const auto& value) {
-                return std::find(value_.begin(), value_.end(), value) == value_.end();
-            }
-        );
+    Property&
+    operator|=(const Property& rhs) noexcept {
+        std::copy_if(rhs.value_.begin(), rhs.value_.end(),
+                     std::back_inserter(value_), [this](const auto& value) {
+                         return std::find(value_.begin(), value_.end(),
+                                          value) == value_.end();
+                     });
 
         return *this;
     }
 
     /// @brief  Checks whether or not this \c Property has a value.
     /// @return \c true if this \c Property has a value, \c false otherwise.
-    bool has_value() const noexcept {
+    bool
+    has_value() const noexcept {
         return value_.size() > 0;
     }
 
-private:
+    private:
     std::vector<TContained> value_;
 };
 
@@ -302,14 +326,14 @@ using VectorProperty = Property<std::vector<TContained>, false>;
 /// @param  delimiter How to split the string into values.
 /// @return The created property.
 inline VectorProperty<std::string>
-vectorPropertyFromString(std::string_view value, char delimiter = ' ') noexcept {
+vectorPropertyFromString(std::string_view value,
+                         char delimiter = ' ') noexcept {
     // Split the string into vector of strings, then assign.
     std::vector<std::string> values;
     std::istringstream iss(value.data());
     std::string token;
 
-    while (std::getline(iss, token, delimiter))
-        values.push_back(token);
+    while (std::getline(iss, token, delimiter)) values.push_back(token);
 
     return Property<std::vector<std::string>, false>(std::move(values));
 }
@@ -320,24 +344,26 @@ vectorPropertyFromString(std::string_view value, char delimiter = ' ') noexcept 
 /// @param  delimiter How to join the values into a string.
 /// @return The created string.
 inline std::string
-vectorPropertyToString(const VectorProperty<std::string>& property, char delimiter = ' ') noexcept {
+vectorPropertyToString(const VectorProperty<std::string>& property,
+                       char delimiter = ' ') noexcept {
     std::ostringstream oss;
-    for (const auto& value : *property)
-        oss << value << delimiter;
+    for (const auto& value : *property) oss << value << delimiter;
     return oss.str();
 }
 
 
-}
+} // namespace cpak
 
 
 template<>
 struct YAML::convert<cpak::RequiredProperty<std::string>> {
-    static Node encode(const cpak::RequiredProperty<std::string>& rhs) {
+    static Node
+    encode(const cpak::RequiredProperty<std::string>& rhs) {
         return Node(*rhs);
     }
 
-    static bool decode(const Node& node, cpak::RequiredProperty<std::string>& rhs) {
+    static bool
+    decode(const Node& node, cpak::RequiredProperty<std::string>& rhs) {
         rhs = node.as<std::string>();
         return true;
     }
@@ -345,13 +371,13 @@ struct YAML::convert<cpak::RequiredProperty<std::string>> {
 
 template<>
 struct YAML::convert<cpak::OptionalProperty<std::string>> {
-    static Node encode(const cpak::OptionalProperty<std::string>& rhs) {
-        return rhs.has_value()
-            ? Node(*rhs)
-            : Node();
+    static Node
+    encode(const cpak::OptionalProperty<std::string>& rhs) {
+        return rhs.has_value() ? Node(*rhs) : Node();
     }
 
-    static bool decode(const Node& node, cpak::OptionalProperty<std::string>& rhs) {
+    static bool
+    decode(const Node& node, cpak::OptionalProperty<std::string>& rhs) {
         rhs = node.as<std::string>();
         return true;
     }
@@ -359,13 +385,13 @@ struct YAML::convert<cpak::OptionalProperty<std::string>> {
 
 template<>
 struct YAML::convert<cpak::VectorProperty<std::string>> {
-    static Node encode(const cpak::VectorProperty<std::string>& rhs) {
-        return rhs.has_value()
-            ? Node(*rhs)
-            : Node();
+    static Node
+    encode(const cpak::VectorProperty<std::string>& rhs) {
+        return rhs.has_value() ? Node(*rhs) : Node();
     }
 
-    static bool decode(const Node& node, cpak::VectorProperty<std::string>& rhs) {
+    static bool
+    decode(const Node& node, cpak::VectorProperty<std::string>& rhs) {
         rhs = node.as<std::vector<std::string>>();
         return true;
     }

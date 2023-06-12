@@ -76,7 +76,7 @@ address: https://gitlab.com
 email:
     - johndoe@gmail.com
 )";
-    
+
     try {
         const auto& yaml       = YAML::Load(yamlStr);
         const auto& repository = yaml.as<cpak::Repository>();

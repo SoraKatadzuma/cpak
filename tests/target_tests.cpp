@@ -92,7 +92,7 @@ sources:
   - src/base.cpp
   - src/base.hpp
 )";
-    
+
     try {
         const auto& yaml   = YAML::Load(yamlStr);
         const auto& target = yaml.as<BuildTarget>();
@@ -112,7 +112,7 @@ sources:
   - src/base.cpp
   - src/base.hpp
 )";
-    
+
     try {
         const auto& yaml   = YAML::Load(yamlStr);
         const auto& target = yaml.as<BuildTarget>();
@@ -134,7 +134,7 @@ sources:
   - src/base.cpp
   - src/base.hpp
 )";
-    
+
     try {
         const auto& yaml   = YAML::Load(yamlStr);
         const auto& target = yaml.as<BuildTarget>();
@@ -223,7 +223,7 @@ sources:
   - src/base.cpp
   - src/base.hpp
 )";
-    
+
     try {
         const auto& yaml   = YAML::Load(yamlStr);
         const auto& target = yaml.as<BuildTarget>();
@@ -271,11 +271,11 @@ sources:
   - src/base.cpp
   - src/base.hpp
 )";
-    
+
     try {
         const auto& yaml   = YAML::Load(yamlStr);
         const auto& target = yaml.as<BuildTarget>();
-    } catch (const YAML::Exception& e) { 
+    } catch (const YAML::Exception& e) {
         EXPECT_EQ(e.msg, "Target interfaces must be a sequence.");
     }
 }
@@ -342,7 +342,7 @@ search:
     ./lib;
     ./other/lib
 )";
-    
+
     try {
         const auto& yaml   = YAML::Load(yamlStr);
         const auto& target = yaml.as<SearchPaths>();
@@ -358,7 +358,7 @@ search:
     /usr/include;
     /usr/local/include
 )";
-        
+
     try {
         const auto& yaml   = YAML::Load(yamlStr);
         const auto& target = yaml.as<SearchPaths>();

@@ -40,9 +40,9 @@ constexpr std::string_view kSuccessMessage = "Success"; // Generic success.
 constexpr std::string_view kFailureMessage = "Failure"; // Generic failure.
 constexpr std::string_view kPathDoesNotExistMessage = "Path does not exist";
 constexpr std::string_view kNoCPakFileAtPathMessage = "No CPakfile at path";
-constexpr std::string_view kInvalidCPakFileMessage = "Invalid CPakfile";
+constexpr std::string_view kInvalidCPakFileMessage  = "Invalid CPakfile";
 
-}
+} // namespace cpak::errc
 
 
 namespace cpak {
@@ -50,24 +50,28 @@ namespace cpak {
 
 /// @brief  Gets the category for the generic status codes.
 /// @return The preconstructed generic category.
-const std::error_category& generic_category() noexcept;
+const std::error_category&
+generic_category() noexcept;
 
 /// @brief  Gets the category for the build status codes.
 /// @return The preconstructed build category.
-const std::error_category& build_category() noexcept;
+const std::error_category&
+build_category() noexcept;
 
 /// @brief  Gets the category for the unknown status codes.
 /// @return The preconstructed unknown category.
-const std::error_category& unknown_category() noexcept;
+const std::error_category&
+unknown_category() noexcept;
 
 
 /// @brief  Makes an error code from the given \c errc::values.
 /// @param  value The value of the \c cpak::errc code.
 /// @return The constructed error code.
-inline std::error_code make_error_code(errc::values value) noexcept {
+inline std::error_code
+make_error_code(errc::values value) noexcept {
     if (value >= errc::generic_begin && value <= errc::generic_end)
         return std::error_code(value, cpak::generic_category());
     return std::error_code(value, cpak::unknown_category());
 }
 
-}
+} // namespace cpak

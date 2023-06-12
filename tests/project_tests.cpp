@@ -30,7 +30,8 @@ authors:
     EXPECT_TRUE(project.homePage.has_value());
     EXPECT_EQ(project.homePage.value(), "https://github.com/simtech/sample");
     EXPECT_TRUE(project.issuesPage.has_value());
-    EXPECT_EQ(project.issuesPage.value(), "https://github.com/simtech/sample/issues");
+    EXPECT_EQ(project.issuesPage.value(),
+              "https://github.com/simtech/sample/issues");
     EXPECT_TRUE(project.license.has_value());
     EXPECT_EQ(project.license.value(), "MIT");
     EXPECT_EQ(project.authors.size(), 2);
@@ -74,7 +75,7 @@ TEST(ProjectTests, cannotDecodeProjectMissingGpid) {
 name: sample
 semv: 1.0.0
 )";
-    
+
     try {
         const auto& yaml    = YAML::Load(yamlStr);
         const auto& project = yaml.as<cpak::ProjectInfo>();
@@ -90,7 +91,7 @@ gpid:
   - simtech
 semv: 1.0.0
 )";
-    
+
     try {
         const auto& yaml    = YAML::Load(yamlStr);
         const auto& project = yaml.as<cpak::ProjectInfo>();
@@ -104,7 +105,7 @@ TEST(ProjectTests, cannotDecodeProjectMissingSemv) {
 name: sample
 gpid: simtech
 )";
-    
+
     try {
         const auto& yaml    = YAML::Load(yamlStr);
         const auto& project = yaml.as<cpak::ProjectInfo>();
@@ -120,7 +121,7 @@ gpid: simtech
 semv:
   - 1.0.0
 )";
-    
+
     try {
         const auto& yaml    = YAML::Load(yamlStr);
         const auto& project = yaml.as<cpak::ProjectInfo>();
@@ -137,7 +138,7 @@ semv: 1.0.0
 desc:
   - This is a sample project.
 )";
-        
+
     try {
         const auto& yaml    = YAML::Load(yamlStr);
         const auto& project = yaml.as<cpak::ProjectInfo>();
@@ -191,7 +192,7 @@ license:
 
     try {
         const auto& yaml    = YAML::Load(yamlStr);
-        const auto& project = yaml.as<cpak::ProjectInfo>(); 
+        const auto& project = yaml.as<cpak::ProjectInfo>();
     } catch (const YAML::Exception& e) {
         EXPECT_EQ(e.msg, "Project license must be a string.");
     }
@@ -207,7 +208,7 @@ authors: John Doe
 
     try {
         const auto& yaml    = YAML::Load(yamlStr);
-        const auto& project = yaml.as<cpak::ProjectInfo>(); 
+        const auto& project = yaml.as<cpak::ProjectInfo>();
     } catch (const YAML::Exception& e) {
         EXPECT_EQ(e.msg, "Project authors must be a sequence.");
     }

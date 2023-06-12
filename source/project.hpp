@@ -19,26 +19,36 @@ struct ProjectInfo : public Identity {
 };
 
 
+static std::filesystem::path
+absoluteRootPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path
+absoluteBuildPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path
+absoluteBinariesPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path
+absoluteLibrariesPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path
+absoluteObjectsPath(const ProjectInfo& project) noexcept;
 
-static std::filesystem::path absoluteRootPath(const ProjectInfo& project) noexcept;
-static std::filesystem::path absoluteBuildPath(const ProjectInfo& project) noexcept;
-static std::filesystem::path absoluteBinariesPath(const ProjectInfo& project) noexcept;
-static std::filesystem::path absoluteLibrariesPath(const ProjectInfo& project) noexcept;
-static std::filesystem::path absoluteObjectsPath(const ProjectInfo& project) noexcept;
-
-static std::filesystem::path relativeRootPath(const ProjectInfo& project) noexcept;
-static std::filesystem::path relativeBuildPath(const ProjectInfo& project) noexcept;
-static std::filesystem::path relativeBinariesPath(const ProjectInfo& project) noexcept;
-static std::filesystem::path relativeLibrariesPath(const ProjectInfo& project) noexcept;
-static std::filesystem::path relativeObjectsPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path
+relativeRootPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path
+relativeBuildPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path
+relativeBinariesPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path
+relativeLibrariesPath(const ProjectInfo& project) noexcept;
+static std::filesystem::path
+relativeObjectsPath(const ProjectInfo& project) noexcept;
 
 
 /// @brief  Validates the given project schema.
 /// @param  node The node to validate.
-inline void validateProjectSchema(const YAML::Node& node) {
+inline void
+validateProjectSchema(const YAML::Node& node) {
     if (!node.IsMap())
         throw YAML::Exception(node.Mark(), "Project is not a map");
-    
+
     // Validate required fields.
     if (!node["name"])
         throw YAML::Exception(node.Mark(), "Project is missing a name.");
@@ -55,7 +65,7 @@ inline void validateProjectSchema(const YAML::Node& node) {
     else if (!node["semv"].IsScalar())
         throw YAML::Exception(node.Mark(), "Project semv must be a string.");
 
-    // Validate optional fields.        
+    // Validate optional fields.
     if (node["desc"] && !node["desc"].IsScalar())
         throw YAML::Exception(node.Mark(), "Project desc must be a string.");
 
@@ -67,44 +77,48 @@ inline void validateProjectSchema(const YAML::Node& node) {
 
     if (node["license"] && !node["license"].IsScalar())
         throw YAML::Exception(node.Mark(), "Project license must be a string.");
- 
+
     if (node["authors"] && !node["authors"].IsSequence())
-        throw YAML::Exception(node.Mark(), "Project authors must be a sequence.");
+        throw YAML::Exception(node.Mark(),
+                              "Project authors must be a sequence.");
 }
 
 
-}
+} // namespace cpak
 
 
 template<>
 struct YAML::convert<cpak::ProjectInfo> {
-    static Node encode(const cpak::ProjectInfo& rhs) {
+    static Node
+    encode(const cpak::ProjectInfo& rhs) {
         Node node;
         node["name"] = rhs.name;
         node["gpid"] = rhs.gpid;
         node["semv"] = rhs.semv;
 
         // Optional fields.
-        if (rhs.description.has_value()) node["desc"]    = *rhs.description;
-        if (rhs.homePage.has_value())    node["home"]    = *rhs.homePage;
-        if (rhs.issuesPage.has_value())  node["issues"]  = *rhs.issuesPage;
-        if (rhs.license.has_value())     node["license"] = *rhs.license;
-        if (!rhs.authors.empty())        node["authors"] = rhs.authors;
+        if (rhs.description.has_value()) node["desc"] = *rhs.description;
+        if (rhs.homePage.has_value()) node["home"] = *rhs.homePage;
+        if (rhs.issuesPage.has_value()) node["issues"] = *rhs.issuesPage;
+        if (rhs.license.has_value()) node["license"] = *rhs.license;
+        if (!rhs.authors.empty()) node["authors"] = rhs.authors;
         return node;
     }
 
-    static bool decode(const Node& node, cpak::ProjectInfo& rhs) {
+    static bool
+    decode(const Node& node, cpak::ProjectInfo& rhs) {
         cpak::validateProjectSchema(node);
         rhs.name = node["name"].as<std::string>();
         rhs.gpid = node["gpid"].as<std::string>();
         rhs.semv = node["semv"].as<cpak::version>();
-        
+
         // Optional fields.
-        if (node["desc"])    rhs.description = node["desc"].as<std::string>();
-        if (node["home"])    rhs.homePage    = node["home"].as<std::string>();
-        if (node["issues"])  rhs.issuesPage  = node["issues"].as<std::string>();
-        if (node["license"]) rhs.license     = node["license"].as<std::string>();
-        if (node["authors"]) rhs.authors     = node["authors"].as<std::vector<std::string>>();
+        if (node["desc"]) rhs.description = node["desc"].as<std::string>();
+        if (node["home"]) rhs.homePage = node["home"].as<std::string>();
+        if (node["issues"]) rhs.issuesPage = node["issues"].as<std::string>();
+        if (node["license"]) rhs.license = node["license"].as<std::string>();
+        if (node["authors"])
+            rhs.authors = node["authors"].as<std::vector<std::string>>();
         return true;
     }
 };
