@@ -18,8 +18,10 @@ using std::vector;
 
 extern void
 updateOptions(CPakFile& cpakfile, const vector<string>& options) noexcept;
+
 extern void
 interpolateOptions(BuildTarget& target, const vector<BuildOption>& options);
+
 extern void
 interpolateOptions(CPakFile& cpakfile) noexcept;
 
@@ -40,13 +42,31 @@ cpak::management::loadCPakFile(
         return std::make_tuple(std::nullopt, loadStatus);
     }
 
-    const auto& cpakfilePath = projectPath / "CPakFile";
-    logger->info("Checking CPakfile '{}'", cpakfilePath.c_str());
-    if (!std::filesystem::exists(cpakfilePath)) {
+    auto cpakfileFound = false;
+    auto cpakfilePath  = std::filesystem::path();
+    std::array<std::filesystem::path, 3> cpakfileVariants{
+        projectPath/"CPakFile",
+        projectPath/"CPakFile.yaml",
+        projectPath/"CPakFile.yml"
+    };
+    
+    for (const auto& path : cpakfileVariants) {
+        logger->info("Searching for CPakfile '{}'", path.c_str());
+        if (!std::filesystem::exists(path))
+            continue;
+        
+        cpakfileFound = true;
+        cpakfilePath = path;
+        break;
+    }
+
+    // We exhausted our tries, so we can't find the CPakfile.
+    if (!cpakfileFound) {
         loadStatus = make_error_code(errc::noCPakFileAtPath);
         return std::make_tuple(std::nullopt, loadStatus);
     }
 
+    logger->info("Found CPakfile '{}'", cpakfilePath.c_str());
     logger->debug("Loading CPakfile '{}'", cpakfilePath.c_str());
 
     std::optional<CPakFile> cpakfile;
@@ -112,6 +132,7 @@ cpak::management::cloneDependency(const cpak::Dependency& dependency,
                                   const std::string& dependencyPath) noexcept {
     using namespace std::string_literals;
 
+    // TODO: account for version.
     auto logger    = spdlog::get("cpak");
     auto remoteURL = dependency.remote != std::nullopt
                          ? *dependency.remote->address

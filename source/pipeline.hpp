@@ -25,10 +25,6 @@ queueForBuild(const CPakFile& cpakfile, const BuildTarget& target) noexcept;
 std::error_code
 executeBuild() noexcept;
 
-/// @brief  Executes the pull command.
-/// @return The status code for the operation.
-std::error_code
-executePull() noexcept;
 
 
 } // namespace cpak

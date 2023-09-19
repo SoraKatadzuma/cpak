@@ -295,7 +295,38 @@ handleBuildCommand() noexcept {
 
 std::error_code
 handlePullCommand() noexcept {
+    using namespace std::string_literals;
 
+    // TODO: allow for custom remote addresses.
+    const auto cpakid = cpak::identityFromString(pullcmd->get("id"));
+    const auto remote = cpak::Repository {
+        .address  = "https://github.com"s,
+        .username = ""s,
+        .email    = ""s,
+        .password = ""s,
+    };
+
+    // Build dependency manually.
+    auto dependency = cpak::Dependency{};
+    dependency.name = cpakid.name;
+    dependency.gpid = cpakid.gpid;
+    dependency.semv = cpakid.semv;
+    dependency.remote = remote;
+
+    // Clone the dependency.
+    const auto [dependencyPath, findResult] =
+        mgmt::findDependencyPath(dependency);
+    
+    // Dependency already exists.
+    if (findResult.value() == cpak::errc::success &&
+        !pullcmd->get<bool>("--update"))
+        return findResult;
+
+    const auto [optCPakFile, result] =
+        mgmt::cloneDependency(dependency, dependencyPath);
+    (void)optCPakFile;
+
+    return result;
 }
 
 
@@ -339,9 +370,6 @@ cpak::application::run(const vector<string>& arguments) noexcept {
     } else if (program->is_subcommand_used("pull")) {
         commandString = "pull";
         commandStatus = handlePullCommand();
-        if (commandStatus.value() != cpak::errc::success) return commandStatus;
-
-        commandStatus = executePull();
         return commandStatus;
     }
 
