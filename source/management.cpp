@@ -141,13 +141,44 @@ cpak::management::cloneDependency(const cpak::Dependency& dependency,
     logger->info("Cloning dependency '{}'", dependency.name->c_str());
     remoteURL += "/"s + *dependency.gpid + "/"s + *dependency.name;
 
-    auto command = subprocess::Popen(
-        { "git", "clone", remoteURL, dependencyPath },
+    // Check if remote has repo.
+    logger->debug("Checking if remote '{}' exists", remoteURL.c_str());
+    auto gitLsRemoteCommand = subprocess::Popen(
+        { "git", "ls-remote", remoteURL },
         subprocess::output{ subprocess::PIPE },
         subprocess::error{ subprocess::PIPE }, subprocess::shell{ true });
 
-    auto [output, error] = command.communicate();
-    if (command.retcode() != errc::success)
+    auto [output, error] = gitLsRemoteCommand.communicate();
+    if (gitLsRemoteCommand.retcode() != errc::success) {
+        logger->debug("Did not find remote '{}'", remoteURL.c_str());
+        return std::make_tuple(std::nullopt,
+                               make_error_code(errc::gitRemoteNotFound));
+    }
+
+    const auto version = dependency.versionIsBranch
+        ? dependency.semv->prerelease()
+        : dependency.semv->str();
+
+    // Check if version/branch exists.
+    logger->debug("Checking if version '{}' exists", version);
+    const auto outputStr = std::string(output.buf.begin(), output.buf.end());
+    if (outputStr.find(version) == std::string::npos) {
+        logger->debug("Did not find version '{}'", version);
+        return std::make_tuple(std::nullopt,
+                               make_error_code(errc::gitRemoteVersionNotFound));
+    }
+
+    const auto versionFlag = "-b " + version;
+    const auto depthFlag   = "--depth=1";
+
+    // Try clone with version/branch flag.
+    auto gitCloneCommand = subprocess::Popen(
+        { "git", "clone", depthFlag, versionFlag, remoteURL, dependencyPath },
+        subprocess::output{ subprocess::PIPE },
+        subprocess::error{ subprocess::PIPE }, subprocess::shell{ true });
+
+    std::tie(output, error) = gitCloneCommand.communicate();
+    if (gitCloneCommand.retcode() != errc::success)
         return std::make_tuple(std::nullopt,
                                make_error_code(errc::gitCloneFailed));
 

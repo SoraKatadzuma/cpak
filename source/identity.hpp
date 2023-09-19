@@ -14,6 +14,7 @@ struct Identity {
     RequiredProperty<version> semv;
 
     bool isMapped{ false };
+    bool versionIsBranch{ false };
 };
 
 
@@ -69,7 +70,7 @@ validateIdentitySchema(const YAML::Node& node) {
 /// @param  cpakid The CPakID to break down.
 /// @return An Identity struct containing the CPakID components.
 inline Identity
-identityFromString(std::string_view cpakid) {
+identityFromString(std::string_view cpakid, bool useBranch = false) {
     Identity result;
     std::string token;
     std::istringstream iss(cpakid.data());
@@ -91,7 +92,13 @@ identityFromString(std::string_view cpakid) {
     std::getline(iss, token);
     if (token.empty())
         throw std::runtime_error("Invalid CPakID format, missing version.");
-    result.semv = version::parse(token);
+    
+    const auto versionString = useBranch
+        ? "0.0.0-" + token
+        : token;
+
+    result.semv = version::parse(versionString);
+    result.versionIsBranch = useBranch;
     return result;
 }
 

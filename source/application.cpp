@@ -31,6 +31,7 @@ std::shared_ptr<Configuration> config;
 std::queue<std::function<std::error_code()>> buildQueue;
 std::unordered_map<string, CPakFile> dependencyCache;
 std::unordered_map<string, const BuildTarget*> interfaceCache;
+bool pulling;
 
 
 std::string
@@ -211,7 +212,7 @@ initBuildCommand() noexcept {
 }
 
 void
-initCloneCommand() noexcept {
+initPullCommand() noexcept {
     pullcmd = std::make_shared<ArgumentParser>(
         "pull", "1.0", argparse::default_arguments::help);
 
@@ -225,6 +226,16 @@ initCloneCommand() noexcept {
         .help("Updates the project if it already exists.")
         .default_value(false)
         .implicit_value(true);
+
+    pullcmd->add_argument("-b", "--branch")
+        .help("Informs CPak that the version is a branch.")
+        .default_value(false)
+        .implicit_value(true);
+
+    pullcmd->add_argument("--define")
+        .help("Sets an option in the dependency")
+        .metavar("OPTION[:value]")
+        .append();
 
     pullcmd->add_argument("id")
         .help("The ID of the project to clone from GitHub.")
@@ -241,8 +252,12 @@ internalLoadCPakFile(const fs::path& projectPath) noexcept {
     if (result.value() != cpak::errc::success)
         return { cpakfile, result }; // Let the caller handle the error.
 
-    if (buildcmd->is_used("--define"))
-        updateOptions(*cpakfile, buildcmd->get<vector<string>>("--define"));
+    auto command = pulling
+        ? pullcmd
+        : buildcmd;
+
+    if (command->is_used("--define"))
+        updateOptions(*cpakfile, command->get<vector<string>>("--define"));
 
     interpolateOptions(*cpakfile);
     for (const auto& target : cpakfile->targets) {
@@ -297,8 +312,13 @@ std::error_code
 handlePullCommand() noexcept {
     using namespace std::string_literals;
 
+    pulling = true;
+
     // TODO: allow for custom remote addresses.
-    const auto cpakid = cpak::identityFromString(pullcmd->get("id"));
+    const auto versionIsBranch = pullcmd->get<bool>("--branch");
+    const auto cpakid = cpak::identityFromString(
+        pullcmd->get("id"), versionIsBranch);
+
     const auto remote = cpak::Repository {
         .address  = "https://github.com"s,
         .username = ""s,
@@ -312,21 +332,33 @@ handlePullCommand() noexcept {
     dependency.gpid = cpakid.gpid;
     dependency.semv = cpakid.semv;
     dependency.remote = remote;
+    dependency.versionIsBranch = cpakid.versionIsBranch;
 
     // Clone the dependency.
-    const auto [dependencyPath, findResult] =
-        mgmt::findDependencyPath(dependency);
+    std::error_code         result;
+    std::filesystem::path   dependencyPath;
+    std::optional<CPakFile> cpakfile;
     
+    std::tie(dependencyPath, result) =
+        mgmt::findDependencyPath(dependency);
+
     // Dependency already exists.
-    if (findResult.value() == cpak::errc::success &&
+    if (result.value() == cpak::errc::success &&
         !pullcmd->get<bool>("--update"))
-        return findResult;
+        return result;
 
-    const auto [optCPakFile, result] =
+    // TODO: Create function specifically for the operation of loading and building.
+    //       Both pull and the actual build command rely on this functionality.
+    std::tie(cpakfile, result) =
         mgmt::cloneDependency(dependency, dependencyPath);
-    (void)optCPakFile;
+    if (result.value() != cpak::errc::success)
+        return result; // Let the caller handle the error.
+    
+    result = cpak::queueForBuild(cpakfile.value());
+    if (result.value() != cpak::errc::success)
+        return result; // Let the caller handle the error.
 
-    return result;
+    return cpak::executeBuild();
 }
 
 
@@ -336,7 +368,7 @@ cpak::application::init() noexcept {
     loadConfig();
     initProgram();
     initBuildCommand();
-    initCloneCommand();
+    initPullCommand();
 
     spdlog::register_logger(logger);
     return cpak::make_error_code(errc::success);

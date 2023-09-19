@@ -34,6 +34,18 @@ struct CPakBuildErrorCategory : public std::error_category {
     message(int code) const override {
         // TODO: add build error codes.
         switch (code) {
+        case cpak::errc::dependencyNotFound:
+            return cpak::errc::kDependencyNotFoundMessage.data();
+        case cpak::errc::gitRemoteNotFound:
+            return cpak::errc::kGitRemoteNotFoundMessage.data();
+        case cpak::errc::gitRemoteVersionNotFound:
+            return cpak::errc::kGitRemoteVersionNotFoundMessage.data();
+        case cpak::errc::gitCloneFailed:
+            return cpak::errc::kGitCloneFailedMessage.data();
+        case cpak::errc::interfaceNotFound:
+            return cpak::errc::kInterfaceNotFoundMessage.data();
+        case cpak::errc::interfaceNameCollision:
+            return cpak::errc::kInterfaceNameCollisionMessage.data();
         default: return "Unknown error";
         }
     }

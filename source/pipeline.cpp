@@ -154,15 +154,19 @@ gatherLinkingArguments(const cpak::CPakFile& cpakfile,
 std::error_code
 cpak::queueForBuild(const cpak::CPakFile& cpakfile,
                     const cpak::BuildTarget& target) noexcept {
-    if (target.type == TargetType::Interface)
+    
+    auto logger = spdlog::get("cpak");
+    if (target.type == TargetType::Interface) {
+        logger->info("Skipping interface target: {}", target.name->c_str());
         return make_error_code(errc::success);
+    }
 
+    logger->info("Found target '{}'", target.name->c_str());
     auto [consolidated, result] =
         constructConsolidatedTarget(cpakfile.targets, target);
     if (result.value() != cpak::errc::success)
         return result; // Let the caller handle the error.
 
-    auto logger    = spdlog::get("cpak");
     auto arguments = gatherCompilationArguments(consolidated);
     auto objects   = std::vector<std::string>();
     objects.reserve(target.sources->size());

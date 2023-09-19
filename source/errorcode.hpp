@@ -19,6 +19,8 @@ enum values : std::uint16_t {
 
     // Build error codes.
     dependencyNotFound,
+    gitRemoteNotFound,
+    gitRemoteVersionNotFound,
     gitCloneFailed,
     interfaceNotFound,
     interfaceNameCollision,
@@ -41,6 +43,13 @@ constexpr std::string_view kFailureMessage = "Failure"; // Generic failure.
 constexpr std::string_view kPathDoesNotExistMessage = "Path does not exist";
 constexpr std::string_view kNoCPakFileAtPathMessage = "No CPakfile at path";
 constexpr std::string_view kInvalidCPakFileMessage  = "Invalid CPakfile";
+
+constexpr std::string_view kDependencyNotFoundMessage = "Dependency not found";
+constexpr std::string_view kGitRemoteNotFoundMessage = "Git remote not found";
+constexpr std::string_view kGitRemoteVersionNotFoundMessage = "Git remote version not found";
+constexpr std::string_view kGitCloneFailedMessage = "Git clone failed";
+constexpr std::string_view kInterfaceNotFoundMessage = "Interface not found";
+constexpr std::string_view kInterfaceNameCollisionMessage = "Interface name collision";
 
 } // namespace cpak::errc
 
@@ -71,6 +80,8 @@ inline std::error_code
 make_error_code(errc::values value) noexcept {
     if (value >= errc::generic_begin && value <= errc::generic_end)
         return std::error_code(value, cpak::generic_category());
+    if (value >= errc::build_begin && value <= errc::build_end)
+        return std::error_code(value, cpak::build_category());
     return std::error_code(value, cpak::unknown_category());
 }
 
