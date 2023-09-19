@@ -1,6 +1,6 @@
 #pragma once
-#include "property.hpp"
 #include "option.hpp"
+#include "property.hpp"
 
 namespace cpak {
 
@@ -39,6 +39,14 @@ struct BuildTarget {
     OptionalProperty<SearchPaths> search;
     RequiredProperty<std::string> name{ "INVALID" };
     RequiredProperty<TargetType> type{ TargetType::Undefined };
+};
+
+
+/// @brief   Contains the install target information.
+/// @details ...
+struct InstallTarget {
+    RequiredProperty<std::string> source;
+    RequiredProperty<std::string> destination;
 };
 
 

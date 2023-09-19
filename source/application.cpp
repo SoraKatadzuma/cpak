@@ -26,6 +26,7 @@ using std::vector;
 std::shared_ptr<spdlog::logger> logger;
 std::shared_ptr<ArgumentParser> program;
 std::shared_ptr<ArgumentParser> buildcmd;
+std::shared_ptr<ArgumentParser> pullcmd;
 std::shared_ptr<Configuration> config;
 std::queue<std::function<std::error_code()>> buildQueue;
 std::unordered_map<string, CPakFile> dependencyCache;
@@ -209,6 +210,29 @@ initBuildCommand() noexcept {
     program->add_subparser(*buildcmd);
 }
 
+void
+initCloneCommand() noexcept {
+    pullcmd = std::make_shared<ArgumentParser>(
+        "pull", "1.0", argparse::default_arguments::help);
+
+    pullcmd->add_description("Pulls a project from GitHub given a project ID.\n"
+                             "A Project ID is in the form User/Project@Version.\n"
+                             "The version is optional and defaults to latest.\n"
+                             "The version will pull a specific tag or branch.");
+    pullcmd->set_assign_chars("=:");
+
+    pullcmd->add_argument("-u", "--update")
+        .help("Updates the project if it already exists.")
+        .default_value(false)
+        .implicit_value(true);
+
+    pullcmd->add_argument("id")
+        .help("The ID of the project to clone from GitHub.")
+        .metavar("id")
+        .nargs(1);
+
+    program->add_subparser(*pullcmd);
+}
 
 std::tuple<std::optional<CPakFile>, std::error_code>
 internalLoadCPakFile(const fs::path& projectPath) noexcept {
@@ -270,11 +294,18 @@ handleBuildCommand() noexcept {
 
 
 std::error_code
+handlePullCommand() noexcept {
+
+}
+
+
+std::error_code
 cpak::application::init() noexcept {
     initLogger();
     loadConfig();
     initProgram();
     initBuildCommand();
+    initCloneCommand();
 
     spdlog::register_logger(logger);
     return cpak::make_error_code(errc::success);
@@ -304,6 +335,13 @@ cpak::application::run(const vector<string>& arguments) noexcept {
         if (commandStatus.value() != cpak::errc::success) return commandStatus;
 
         commandStatus = executeBuild();
+        return commandStatus;
+    } else if (program->is_subcommand_used("pull")) {
+        commandString = "pull";
+        commandStatus = handlePullCommand();
+        if (commandStatus.value() != cpak::errc::success) return commandStatus;
+
+        commandStatus = executePull();
         return commandStatus;
     }
 
