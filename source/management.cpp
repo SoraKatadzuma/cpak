@@ -105,7 +105,8 @@ cpak::management::loadCPakFile(
         // Get 2-3 lines before error and line of error.
         const auto mark = e.mark;
         std::uint32_t longest = 0;
-        for (auto count = 0u; count < 3; count++) {
+        std::uint32_t getLines = (3u < lines.size()) ? 3u : lines.size();
+        for (auto count = 0u; count < getLines; count++) {
             const auto start = mark.line - 1;
             const auto index = start < 0
                 ? 0 + count

@@ -107,18 +107,19 @@ struct YAML::convert<cpak::Accessible<std::string>> {
 
     static bool
     decode(const YAML::Node& node, cpak::Accessible<std::string>& rhs) {
-        if (node.Tag() == "public")
+        if (node.Tag() == "!public")
             rhs = cpak::Accessible<std::string>(node.as<std::string>(),
                                                 cpak::AccessLevel::ePublic);
-        else if (node.Tag() == "protected")
+        else if (node.Tag() == "!protected")
             rhs = cpak::Accessible<std::string>(node.as<std::string>(),
                                                 cpak::AccessLevel::eProtected);
-        else if (node.Tag() == "private")
+        else if (node.Tag() == "!private")
             rhs = cpak::Accessible<std::string>(node.as<std::string>(),
                                                 cpak::AccessLevel::ePrivate);
         else
             rhs = cpak::Accessible<std::string>(node.as<std::string>(),
                                                 cpak::AccessLevel::ePublic);
+        
         return true;
     }
 };

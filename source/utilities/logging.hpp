@@ -16,8 +16,11 @@ reserveAndAppendFormatted(std::vector<std::string>& into,
 
     // Reserve space incase we need it.
     into.reserve(into.size() + from.size());
-    for (const auto& value : from)
+    for (const auto& value : from) {
+        std::cout << "access: " << (std::uint32_t)value.level()
+                  << " value: " << value.stored() << std::endl;
         into.emplace_back(fmt::format(fmt::runtime(pattern), value.stored()));
+    }
 }
 
 /// @brief  Gets the name of the log file for the given project.

@@ -35,6 +35,7 @@ macro(create_test TESTNAME TESTFILE)
 endmacro()
 
 # Create the tests.
+create_test(accessible accessible_tests.cpp)
 create_test(checksum   checksum_tests.cpp)
 create_test(cpakfile   cpakfile_tests.cpp)
 create_test(dependency dependency_tests.cpp)
