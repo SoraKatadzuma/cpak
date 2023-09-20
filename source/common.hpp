@@ -14,6 +14,7 @@
 #include <queue>
 #include <regex>
 #include <sstream>
+#include <streambuf>
 #include <string>
 #include <string_view>
 #include <system_error>

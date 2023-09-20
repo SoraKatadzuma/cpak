@@ -69,18 +69,65 @@ cpak::management::loadCPakFile(
     logger->info("Found CPakfile '{}'", cpakfilePath.c_str());
     logger->debug("Loading CPakfile '{}'", cpakfilePath.c_str());
 
+    // Read file into string so we can use YAML::Marks to report errors.
     std::optional<CPakFile> cpakfile;
+    std::ifstream cpakfileStream(cpakfilePath);
+    if (!cpakfileStream.is_open()) {
+        // TODO: replace this error with something more appropriate.
+        loadStatus = make_error_code(errc::invalidCPakFile);
+        return std::make_tuple(cpakfile, loadStatus);
+    }
+    
+    std::string cpakfileAsString;
+    std::stringstream temporaryStream;
+    temporaryStream << cpakfileStream.rdbuf();
+    cpakfileAsString = temporaryStream.str();
+    cpakfileStream.close();
+
     try {
         // Load CPakFile and set paths.
-        cpakfile = YAML::LoadFile(cpakfilePath.string()).as<CPakFile>();
+        cpakfile = YAML::Load(temporaryStream.str()).as<CPakFile>();
     } catch (const YAML::Exception& e) {
+        logger->error(fmt::format(fmt::fg(fmt::terminal_color::bright_red),
+            "Failed to load CPakfile '{}'", cpakfilePath.c_str()));
+
+        const auto lines = utilities::splitString(cpakfileAsString, "\n");
+
+        // Reset and reuse.
+        temporaryStream.clear();
+        temporaryStream.str("");
+        temporaryStream << "Error at line " << e.mark.line
+                        << ", column " << e.mark.column
+                        << " of " << cpakfilePath
+                        << std::endl;
+        
+        // Extract Mark and add to error message.
+        // Get 2-3 lines before error and line of error.
+        const auto mark = e.mark;
+        std::uint32_t longest = 0;
+        for (auto count = 0u; count < 3; count++) {
+            const auto start = mark.line - 1;
+            const auto index = start < 0
+                ? 0 + count
+                : start + count;
+
+            const auto line = lines[index];
+            if (line.size() > longest)
+                longest = line.size();
+            
+            temporaryStream << "  " << line << std::endl;
+        }
+
+        auto errorIndicator = std::string(e.msg.length() + mark.column, '_');
+        auto errorExplicit  = std::string(mark.column, ' ');
+        errorIndicator[mark.column] = '^';
+        errorExplicit += e.msg;
+        temporaryStream << "__" << errorIndicator << std::endl
+                        << "  " << errorExplicit << std::endl;
+
         // TODO: backtrace this.
         logger->error(fmt::format(fmt::fg(fmt::terminal_color::bright_red),
-                                  "Failed to load CPakfile '{}'",
-                                  cpakfilePath.c_str()));
-        logger->error(fmt::format(fmt::fg(fmt::terminal_color::bright_red),
-                                  "{}", e.what()));
-
+            "{}", temporaryStream.str()));
         loadStatus = make_error_code(errc::invalidCPakFile);
         cpakfile   = std::nullopt;
     }
