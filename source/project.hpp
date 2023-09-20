@@ -117,8 +117,7 @@ struct YAML::convert<cpak::ProjectInfo> {
         if (node["home"]) rhs.homePage = node["home"].as<std::string>();
         if (node["issues"]) rhs.issuesPage = node["issues"].as<std::string>();
         if (node["license"]) rhs.license = node["license"].as<std::string>();
-        if (node["authors"])
-            rhs.authors = node["authors"].as<std::vector<std::string>>();
+        if (node["authors"]) rhs.authors = node["authors"].as<std::vector<std::string>>();
         return true;
     }
 };

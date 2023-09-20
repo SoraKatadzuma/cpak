@@ -18,14 +18,14 @@ remote:
     const auto& yaml       = YAML::Load(yamlStr);
     const auto& dependency = yaml.as<cpak::Dependency>();
 
-    EXPECT_EQ(*dependency.name, "sample");
-    EXPECT_EQ(*dependency.gpid, "simtech");
+    EXPECT_EQ(dependency.name, "sample");
+    EXPECT_EQ(dependency.gpid, "simtech");
     EXPECT_EQ(dependency.semv, semver::version::parse("1.0.0"));
     EXPECT_TRUE(dependency.remote.has_value());
-    EXPECT_EQ(*dependency.remote->address, "https://gitlab.com");
-    EXPECT_EQ(*dependency.remote->username, "johndoe");
-    EXPECT_EQ(*dependency.remote->email, "johndoe@gmail.com");
-    EXPECT_EQ(*dependency.remote->password, "$SECRET_PASSWORD");
+    EXPECT_EQ(dependency.remote->address, "https://gitlab.com");
+    EXPECT_EQ(dependency.remote->username, "johndoe");
+    EXPECT_EQ(dependency.remote->email, "johndoe@gmail.com");
+    EXPECT_EQ(dependency.remote->password, "$SECRET_PASSWORD");
 }
 
 TEST(DependencyTests, canDecodeDependencyWithoutRepository) {
@@ -36,8 +36,8 @@ simtech/sample@1.0.0
     const auto& yaml       = YAML::Load(yamlStr);
     const auto& dependency = yaml.as<cpak::Dependency>();
 
-    EXPECT_EQ(*dependency.name, "sample");
-    EXPECT_EQ(*dependency.gpid, "simtech");
+    EXPECT_EQ(dependency.name, "sample");
+    EXPECT_EQ(dependency.gpid, "simtech");
     EXPECT_EQ(dependency.semv, semver::version::parse("1.0.0"));
 }
 

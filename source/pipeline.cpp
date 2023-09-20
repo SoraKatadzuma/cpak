@@ -6,12 +6,15 @@
 
 namespace fs = std::filesystem;
 
+using BuildQueue = std::queue<std::function<std::error_code()>>;
+using DependencyCache = std::unordered_map<std::string, cpak::CPakFile>;
+using InterfaceCache = std::unordered_map<std::string, const cpak::BuildTarget*>;
 
 // Referenced from application.cpp
 // Will need to rework how things are shared between compilation units.
-extern std::queue<std::function<std::error_code()>> buildQueue;
-extern std::unordered_map<std::string, cpak::CPakFile> dependencyCache;
-extern std::unordered_map<std::string, const cpak::BuildTarget*> interfaceCache;
+extern BuildQueue buildQueue;
+extern DependencyCache dependencyCache;
+extern InterfaceCache interfaceCache;
 
 
 std::error_code
@@ -31,6 +34,15 @@ executeInShell(const std::vector<std::string>& arguments) {
     if (error.length > 0) logger->error("{}", error.buf.data());
 
     return cpak::make_error_code((cpak::errc::values)command.retcode());
+}
+
+
+cpak::Accessibles<std::string>
+operator|=(const cpak::Accessibles<std::string>& lhs,
+           const cpak::Accessibles<std::string>& rhs) noexcept {
+    auto result = lhs;
+    result.insert(result.end(), rhs.begin(), rhs.end());
+    return result;
 }
 
 
@@ -57,14 +69,14 @@ flattenInterfaceTarget(const std::vector<cpak::BuildTarget>& targets,
                        const cpak::BuildTarget& interface) noexcept {
     cpak::BuildTarget target;
     std::error_code status;
-    for (const auto& inherited : *interface.interfaces) {
-        if (!interfaceCache.contains(inherited)) {
+    for (const auto& inherited : interface.interfaces) {
+        if (!interfaceCache.contains(inherited.stored())) {
             status = cpak::make_error_code(cpak::errc::interfaceNotFound);
             return std::make_tuple(target, status);
         }
 
         std::tie(target, status) =
-            flattenInterfaceTarget(targets, *interfaceCache[inherited]);
+            flattenInterfaceTarget(targets, *interfaceCache[inherited.stored()]);
     }
 
     copyInterfacePropertiesToTarget(interface, target);
@@ -83,31 +95,33 @@ std::vector<std::string>
 gatherCompilationArguments(const cpak::BuildTarget& target) noexcept {
     std::vector<std::string> arguments;
 
-    auto size = target.defines->size() + target.libraries->size() +
+    auto size = target.defines.size() + target.libraries.size() +
                 4; // g++, options, source, and output.
 
     if (target.search != std::nullopt)
-        size += target.search->include->size() + target.search->system->size();
+        size += target.search->include.size() +
+                target.search->system.size();
 
     arguments.reserve(size);
     arguments.emplace_back("g++");
-    if (target.options != std::nullopt) {
-        auto options = cpak::vectorPropertyToString(*target.options);
+    if (!target.options.empty()) {
+        auto options = cpak::accessiblesToString(target.options);
         options      = cpak::utilities::trim(std::move(options));
         arguments.emplace_back(std::move(options));
     }
 
-    cpak::utilities::reserveAndAppendFormatted(arguments, *target.defines,
-                                               "-D {}");
+    cpak::utilities::reserveAndAppendFormatted(
+        arguments, target.defines, "-D {}");
+
     if (target.search != std::nullopt) {
         cpak::utilities::reserveAndAppendFormatted(
-            arguments, *target.search->include, "-I {}");
+            arguments, target.search->include, "-I {}");
         cpak::utilities::reserveAndAppendFormatted(
-            arguments, *target.search->system, "-isystem {}");
+            arguments, target.search->system, "-isystem {}");
     }
 
-    cpak::utilities::reserveAndAppendFormatted(arguments, *target.libraries,
-                                               "-l {}");
+    cpak::utilities::reserveAndAppendFormatted(
+        arguments, target.libraries, "-l {}");
     return arguments;
 }
 
@@ -118,11 +132,13 @@ gatherLinkingArguments(const cpak::CPakFile& cpakfile,
                        const std::vector<std::string>& objects) noexcept {
     std::vector<std::string> arguments;
 
-    auto size = objects.size() + target.libraries->size() +
+    auto size = objects.size() +
+                target.libraries.size() +
                 (dependencyCache.size() * 2) +
                 5; // g++, binaries, libaries, options, output.
 
-    if (target.search != std::nullopt) size += target.search->library->size();
+    if (target.search != std::nullopt)
+        size += target.search->library.size();
 
     arguments.reserve(size);
     arguments.emplace_back("g++");
@@ -143,10 +159,10 @@ gatherLinkingArguments(const cpak::CPakFile& cpakfile,
 
     if (target.search != std::nullopt)
         cpak::utilities::reserveAndAppendFormatted(
-            arguments, *target.search->library, "-L {}");
+            arguments, target.search->library, "-L {}");
 
-    cpak::utilities::reserveAndAppendFormatted(arguments, *target.libraries,
-                                               "-l {}");
+    cpak::utilities::reserveAndAppendFormatted(
+        arguments, target.libraries, "-l {}");
     return arguments;
 }
 
@@ -157,11 +173,11 @@ cpak::queueForBuild(const cpak::CPakFile& cpakfile,
     
     auto logger = spdlog::get("cpak");
     if (target.type == TargetType::Interface) {
-        logger->info("Skipping interface target: {}", target.name->c_str());
+        logger->info("Skipping interface target: {}", target.name.c_str());
         return make_error_code(errc::success);
     }
 
-    logger->info("Found target '{}'", target.name->c_str());
+    logger->info("Found target '{}'", target.name.c_str());
     auto [consolidated, result] =
         constructConsolidatedTarget(cpakfile.targets, target);
     if (result.value() != cpak::errc::success)
@@ -169,10 +185,10 @@ cpak::queueForBuild(const cpak::CPakFile& cpakfile,
 
     auto arguments = gatherCompilationArguments(consolidated);
     auto objects   = std::vector<std::string>();
-    objects.reserve(target.sources->size());
+    objects.reserve(target.sources.size());
 
-    for (const auto& source : *target.sources) {
-        const auto sourcePath = cpakfile.projectPath / source;
+    for (const auto& source : target.sources) {
+        const auto sourcePath = cpakfile.projectPath / source.stored();
         const auto objectPath =
             cpakfile.objectsBuildPath() /
             fmt::format("{}.o", sourcePath.filename().c_str());
@@ -208,19 +224,19 @@ cpak::queueForBuild(const cpak::CPakFile& cpakfile,
         std::string outputName;
         std::filesystem::path outputPath;
 
-        switch (*consolidated.type) {
+        switch (consolidated.type) {
         case cpak::TargetType::Executable:
-            outputPath = cpakfile.binariesBuildPath() / *consolidated.name;
+            outputPath = cpakfile.binariesBuildPath() / consolidated.name;
             arguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
             break;
         case cpak::TargetType::StaticLibrary:
-            outputName = fmt::format("lib{}.a", *consolidated.name);
+            outputName = fmt::format("lib{}.a", consolidated.name);
             outputPath = cpakfile.binariesBuildPath() / outputName;
             arguments.emplace_back("-r");
             arguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
             break;
         case cpak::TargetType::DynamicLibrary:
-            outputName = fmt::format("lib{}.so", *consolidated.name);
+            outputName = fmt::format("lib{}.so", consolidated.name);
             outputPath = cpakfile.librariesBuildPath() / outputName;
             arguments.emplace_back("-shared");
             arguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
@@ -231,7 +247,7 @@ cpak::queueForBuild(const cpak::CPakFile& cpakfile,
         return executeInShell(arguments);
     });
 
-    logger->debug("Queued for Linking: {}", target.name->c_str());
+    logger->debug("Queued for Linking: {}", target.name.c_str());
     return result;
 }
 

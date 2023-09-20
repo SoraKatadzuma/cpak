@@ -179,9 +179,9 @@ checksum(const CPakFile& cpakfile) noexcept {
     std::ostringstream oss;
     Checksum::block_t block;
 
-    oss << *cpakfile.project.name;
+    oss << cpakfile.project.name;
     for (const auto& option : cpakfile.options)
-        oss << *option.name << *option.value;
+        oss << option.name << option.value;
 
     Checksum checksum(oss.str());
     Checksum::finalize(checksum, block);

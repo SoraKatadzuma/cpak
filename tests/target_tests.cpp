@@ -44,15 +44,15 @@ sources:
     EXPECT_EQ(target.type, TargetType::StaticLibrary);
 
     EXPECT_TRUE(target.search.has_value());
-    EXPECT_EQ(target.search->include->size(), 3);
-    EXPECT_EQ(target.search->system->size(), 0);
-    EXPECT_EQ(target.search->library->size(), 3);
-    EXPECT_EQ(target.libraries->size(), 2);
-    EXPECT_EQ(target.defines->size(), 2);
-    EXPECT_EQ(target.sources->size(), 2);
+    EXPECT_EQ(target.search->include.size(), 3);
+    EXPECT_EQ(target.search->system.size(), 0);
+    EXPECT_EQ(target.search->library.size(), 3);
+    EXPECT_EQ(target.libraries.size(), 2);
+    EXPECT_EQ(target.defines.size(), 2);
+    EXPECT_EQ(target.sources.size(), 2);
 
-    EXPECT_TRUE(target.options.has_value());
-    EXPECT_EQ(target.options->size(), 13);
+    EXPECT_TRUE(target.options.size());
+    EXPECT_EQ(target.options.size(), 13);
 }
 
 

@@ -45,8 +45,8 @@ targets:
     const auto& cpakfile = yaml.as<CPakFile>();
 
     // No need to validate contents, purpose of the build target tests.
-    EXPECT_EQ(*cpakfile.project.name, "sample");
-    EXPECT_EQ(*cpakfile.project.gpid, "simtech");
+    EXPECT_EQ(cpakfile.project.name, "sample");
+    EXPECT_EQ(cpakfile.project.gpid, "simtech");
     EXPECT_EQ(cpakfile.project.semv, semver::version::parse("1.0.0"));
     EXPECT_EQ(cpakfile.options.size(), 1);
     EXPECT_EQ(cpakfile.repositories.size(), 1);

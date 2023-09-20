@@ -1,13 +1,10 @@
 #pragma once
-#include "property.hpp"
-
 
 namespace cpak {
 
 
 /// @brief   Defines an build specific option for a project.
-/// @details Build options are used to configure the build process for a
-/// project,
+/// @details Build options are used to configure the build process for a project,
 ///          or at least that's what it's assumed to be used for. As you may
 ///          find, they are more flexible than that. They contain a name, value,
 ///          and a description. The name is used to identify the option, the
@@ -18,9 +15,10 @@ namespace cpak {
 ///          possible to have multiple builds of the same project with different
 ///          options, and they remain cached.
 struct BuildOption {
-    OptionalProperty<std::string> desc;
-    RequiredProperty<std::string> name;
-    RequiredProperty<std::string> value;
+    std::optional<std::string> desc;
+
+    std::string name;
+    std::string value;
 };
 
 
@@ -67,7 +65,7 @@ interpolateOptions(std::string& argument,
 
         if (option == options.end()) continue;
 
-        argument.replace(match.position(), match.length(), *option->value);
+        argument.replace(match.position(), match.length(), option->value);
     }
 }
 
@@ -82,7 +80,8 @@ struct YAML::convert<cpak::BuildOption> {
         Node node;
         node["name"]  = rhs.name;
         node["value"] = rhs.value;
-        if (rhs.desc != std::nullopt) node["desc"] = *rhs.desc;
+        if (rhs.desc != std::nullopt)
+            node["desc"] = *rhs.desc;
 
         return node;
     }
@@ -92,8 +91,8 @@ struct YAML::convert<cpak::BuildOption> {
         cpak::validateBuildOptionSchema(node);
         rhs.name  = node["name"].as<std::string>();
         rhs.value = node["value"].as<std::string>();
-        if (node["desc"]) rhs.desc = node["desc"].as<std::string>();
-
+        if (node["desc"])
+            rhs.desc = node["desc"].as<std::string>();
         return true;
     }
 };

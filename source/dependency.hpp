@@ -8,7 +8,7 @@ namespace cpak {
 /// @brief   Contains information for pulling a dependency from a repository.
 /// @details This struct contains the necessary information to get a
 struct Dependency : public Identity {
-    OptionalProperty<Repository> remote;
+    std::optional<Repository> remote;
 };
 
 
@@ -40,31 +40,13 @@ validateDependencySchema(const YAML::Node& node) {
 
 
 template<>
-struct YAML::convert<cpak::OptionalProperty<cpak::Repository>> {
-    static Node
-    encode(const cpak::OptionalProperty<cpak::Repository>& rhs) {
-        Node node;
-        if (rhs != std::nullopt) node = *rhs;
-        return node;
-    }
-
-    static bool
-    decode(const Node& node, cpak::OptionalProperty<cpak::Repository>& rhs) {
-        cpak::validateRepositorySchema(node);
-        rhs = node.as<cpak::Repository>();
-        return true;
-    }
-};
-
-
-template<>
 struct YAML::convert<cpak::Dependency> {
     static Node
     encode(const cpak::Dependency& rhs) {
         Node node;
         if (rhs.remote != std::nullopt) {
             node["cpakid"] = cpak::identityToString(rhs);
-            node["remote"] = rhs.remote;
+            node["remote"] = rhs.remote.value();
             return node;
         }
 
@@ -92,7 +74,8 @@ struct YAML::convert<cpak::Dependency> {
         rhs.name = identity.name;
         rhs.gpid = identity.gpid;
         rhs.semv = identity.semv;
-        if (node["remote"]) rhs.remote = node["remote"].as<cpak::Repository>();
+        if (node["remote"])
+            rhs.remote = node["remote"].as<cpak::Repository>();
         return true;
     }
 };

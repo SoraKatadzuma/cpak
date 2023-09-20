@@ -14,6 +14,7 @@ namespace mgmt = cpak::management;
 namespace util = cpak::utilities;
 
 using argparse::ArgumentParser;
+using cpak::Accessible;
 using cpak::BuildOption;
 using cpak::BuildTarget;
 using cpak::Configuration;
@@ -23,14 +24,18 @@ using std::string;
 using std::string_view;
 using std::vector;
 
+using BuildQueue = std::queue<std::function<std::error_code()>>;
+using DependencyCache = std::unordered_map<std::string, cpak::CPakFile>;
+using InterfaceCache = std::unordered_map<std::string, const cpak::BuildTarget*>;
+
 std::shared_ptr<spdlog::logger> logger;
 std::shared_ptr<ArgumentParser> program;
 std::shared_ptr<ArgumentParser> buildcmd;
 std::shared_ptr<ArgumentParser> pullcmd;
 std::shared_ptr<Configuration> config;
-std::queue<std::function<std::error_code()>> buildQueue;
-std::unordered_map<string, CPakFile> dependencyCache;
-std::unordered_map<string, const BuildTarget*> interfaceCache;
+BuildQueue buildQueue;
+DependencyCache dependencyCache;
+InterfaceCache interfaceCache;
 bool pulling;
 
 
@@ -92,20 +97,20 @@ interpolateOptions(BuildTarget& target, const vector<BuildOption>& options) {
     using cpak::interpolateOptions;
 
     // TODO: support interpolation of the target type.
-    interpolateOptions(*target.name, options);
-    for (auto&& val : *target.defines) interpolateOptions(val, options);
-    for (auto&& val : *target.interfaces) interpolateOptions(val, options);
-    for (auto&& val : *target.libraries) interpolateOptions(val, options);
-    for (auto&& val : *target.sources) interpolateOptions(val, options);
-    for (auto&& val : *target.options) interpolateOptions(val, options);
+    interpolateOptions(target.name, options);
+    for (auto&& val : target.defines) interpolateOptions(val.stored(), options);
+    for (auto&& val : target.interfaces) interpolateOptions(val.stored(), options);
+    for (auto&& val : target.libraries) interpolateOptions(val.stored(), options);
+    for (auto&& val : target.sources) interpolateOptions(val.stored(), options);
+    for (auto&& val : target.options) interpolateOptions(val.stored(), options);
 
     if (target.search != std::nullopt) {
-        for (auto&& val : *target.search->include)
-            interpolateOptions(val, options);
-        for (auto&& val : *target.search->system)
-            interpolateOptions(val, options);
-        for (auto&& val : *target.search->library)
-            interpolateOptions(val, options);
+        for (auto&& val : target.search->include)
+            interpolateOptions(val.stored(), options);
+        for (auto&& val : target.search->system)
+            interpolateOptions(val.stored(), options);
+        for (auto&& val : target.search->library)
+            interpolateOptions(val.stored(), options);
     }
 }
 
@@ -260,12 +265,12 @@ internalLoadCPakFile(const fs::path& projectPath) noexcept {
 
     interpolateOptions(*cpakfile);
     for (const auto& target : cpakfile->targets) {
-        if (interfaceCache.contains(*target.name))
+        if (interfaceCache.contains(target.name))
             return { cpakfile, cpak::make_error_code(
                                    cpak::errc::interfaceNameCollision) };
 
         if (target.type == cpak::TargetType::Interface)
-            interfaceCache[*target.name] = &target;
+            interfaceCache[target.name] = &target;
     }
 
     cpakfile->projectPath = projectPath;

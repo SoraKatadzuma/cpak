@@ -1,6 +1,7 @@
 #pragma once
+#include "accessible.hpp"
 #include "option.hpp"
-#include "property.hpp"
+#include "utilities/stropts.hpp"
 
 namespace cpak {
 
@@ -22,31 +23,32 @@ enum struct TargetType {
 /// @remarks This is based on the options that are available in the GNU
 ///          toolchain.
 struct SearchPaths {
-    VectorProperty<std::string> include;
-    VectorProperty<std::string> system;
-    VectorProperty<std::string> library;
+    Accessibles<std::string> include;
+    Accessibles<std::string> system;
+    Accessibles<std::string> library;
 };
 
 
 /// @brief   Contains the build target information.
 /// @details ...
 struct BuildTarget {
-    VectorProperty<std::string> defines;
-    VectorProperty<std::string> interfaces;
-    VectorProperty<std::string> libraries;
-    VectorProperty<std::string> sources;
-    VectorProperty<std::string> options;
-    OptionalProperty<SearchPaths> search;
-    RequiredProperty<std::string> name{ "INVALID" };
-    RequiredProperty<TargetType> type{ TargetType::Undefined };
+    Accessibles<std::string> defines;
+    Accessibles<std::string> interfaces;
+    Accessibles<std::string> libraries;
+    Accessibles<std::string> sources;
+    Accessibles<std::string> options;
+    std::optional<SearchPaths> search;
+
+    std::string name{ "INVALID" };
+    TargetType  type{ TargetType::Undefined };
 };
 
 
 /// @brief   Contains the install target information.
 /// @details ...
 struct InstallTarget {
-    RequiredProperty<std::string> source;
-    RequiredProperty<std::string> destination;
+    std::string source;
+    std::string destination;
 };
 
 
@@ -152,32 +154,87 @@ validateTargetSchema(const YAML::Node& node) {
 }
 
 
+/// @brief  Creates a vector from a string.
+/// @param  value The string to create the vector from.
+/// @param  delimiter How to split the string into values.
+/// @return The created vector.
+inline Accessibles<std::string>
+accessiblesFromString(std::string_view value,
+                      char delimiter = ' ') noexcept {
+    // Split the string into vector of strings, then assign.
+    Accessibles<std::string> values;
+    std::istringstream iss(value.data());
+    std::string token;
+    while (std::getline(iss, token, delimiter)) {
+        auto split = utilities::splitStringOnce(token);
+        auto level = AccessLevel::ePublic;
+        if (split.first == "!protected")
+            level = AccessLevel::eProtected;
+        else if (split.first == "!private")
+            level = AccessLevel::ePrivate;
+
+        values.push_back(Accessible(split.second, level));
+    }
+
+    return values;
+}
+
+
+/// @brief  Creates a string from a vector of accessibles.
+/// @param  accessibles The vector to create the string from.
+/// @param  delimiter How to join the values into a string.
+/// @return The created string.
+inline std::string
+accessiblesToString(
+    const Accessibles<std::string>& accessibles,
+          char delimiter = ' ') noexcept {
+    std::ostringstream oss;
+    for (const auto& value : accessibles) {
+        switch (value.level()) {
+        case AccessLevel::ePublic:
+            oss << "!public" << value.stored();
+            break;
+        case AccessLevel::eProtected:
+            oss << "!protected" << value.stored();
+            break;
+        case AccessLevel::ePrivate:
+            oss << "!private" << value.stored();
+            break;
+        }
+
+        oss << value.stored() << delimiter;
+    }
+
+    return oss.str();
+}
+
+
 /// @brief  Converts the given target to a string.
 /// @param  target The target to convert to a string.
 /// @return The string representation of the target.
 inline std::string
 to_string(const BuildTarget& target) noexcept {
     std::ostringstream oss;
-    oss << *target.name << " (" << buildTypeName(*target.type) << ") {\n";
-    oss << "    Defines: " << vectorPropertyToString(target.defines, ';')
+    oss << target.name << " (" << buildTypeName(target.type) << ") {\n";
+    oss << "    Defines: " << accessiblesToString(target.defines, ';')
         << "\n";
-    oss << "    Interfaces: " << vectorPropertyToString(target.interfaces, ';')
+    oss << "    Interfaces: " << accessiblesToString(target.interfaces, ';')
         << "\n";
-    oss << "    Libraries: " << vectorPropertyToString(target.libraries, ';')
+    oss << "    Libraries: " << accessiblesToString(target.libraries, ';')
         << "\n";
-    oss << "    Sources: " << vectorPropertyToString(target.sources, ';')
+    oss << "    Sources: " << accessiblesToString(target.sources, ';')
         << "\n";
     oss << "    Options: "
-        << vectorPropertyToString(target.options); // hasn't been trimmed yet.
+        << accessiblesToString(target.options); // hasn't been trimmed yet.
 
     if (target.search != std::nullopt) {
         oss << "    Search: {\n";
         oss << "        Include: "
-            << vectorPropertyToString(target.search->include, ';') << "\n";
+            << accessiblesToString(target.search->include, ';') << "\n";
         oss << "        System: "
-            << vectorPropertyToString(target.search->system, ';') << "\n";
+            << accessiblesToString(target.search->system, ';') << "\n";
         oss << "        Library: "
-            << vectorPropertyToString(target.search->library, ';') << "\n";
+            << accessiblesToString(target.search->library, ';') << "\n";
         oss << "    }\n";
     }
 
@@ -190,34 +247,22 @@ to_string(const BuildTarget& target) noexcept {
 
 
 template<>
-struct YAML::convert<cpak::RequiredProperty<cpak::TargetType>> {
+struct YAML::convert<cpak::TargetType> {
     static Node
-    encode(const cpak::RequiredProperty<cpak::TargetType>& rhs) {
-        return Node(cpak::buildTypeName(*rhs));
+    encode(const cpak::TargetType& rhs) {
+        Node node;
+        node = cpak::buildTypeName(rhs);
+        return node;
     }
 
     static bool
-    decode(const Node& node, cpak::RequiredProperty<cpak::TargetType>& rhs) {
+    decode(const YAML::Node& node, cpak::TargetType& rhs) {
         cpak::validateTargetTypeSchema(node);
         rhs = cpak::buildTypeFromName(node.as<std::string>());
         return true;
     }
 };
 
-template<>
-struct YAML::convert<cpak::OptionalProperty<cpak::SearchPaths>> {
-    static Node
-    encode(const cpak::OptionalProperty<cpak::SearchPaths>& rhs) {
-        return rhs.has_value() ? Node(*rhs) : Node();
-    }
-
-    static bool
-    decode(const Node& node, cpak::OptionalProperty<cpak::SearchPaths>& rhs) {
-        cpak::validateSearchPathsSchema(node);
-        rhs = node.as<cpak::SearchPaths>();
-        return true;
-    }
-};
 
 template<>
 struct YAML::convert<cpak::SearchPaths> {
@@ -233,12 +278,15 @@ struct YAML::convert<cpak::SearchPaths> {
     static bool
     decode(const YAML::Node& node, cpak::SearchPaths& rhs) {
         cpak::validateSearchPathsSchema(node);
+        cpak::SearchPaths paths;
         if (node["include"])
-            rhs.include = node["include"].as<std::vector<std::string>>();
+            paths.include = node["include"].as<cpak::Accessibles<std::string>>();
         if (node["system"])
-            rhs.system = node["system"].as<std::vector<std::string>>();
+            paths.system = node["system"].as<cpak::Accessibles<std::string>>();
         if (node["library"])
-            rhs.library = node["library"].as<std::vector<std::string>>();
+            paths.library = node["library"].as<cpak::Accessibles<std::string>>();
+        
+        rhs = paths;
         return true;
     }
 };
@@ -255,12 +303,15 @@ struct YAML::convert<cpak::BuildTarget> {
         node["sources"] = rhs.sources;
 
         // Handle optional fields.
-        if (rhs.search != std::nullopt) node["search"] = rhs.search;
-        if (rhs.options != std::nullopt)
-            node["options"] = vectorPropertyToString(rhs.options);
-        if (rhs.defines != std::nullopt) node["defines"] = rhs.defines;
-        if (rhs.libraries != std::nullopt) node["libraries"] = rhs.libraries;
-        if (rhs.interfaces != std::nullopt) node["interfaces"] = rhs.interfaces;
+        if (rhs.search != std::nullopt)
+            node["search"] = rhs.search.value();
+        
+        if (!rhs.options.empty())
+            node["options"] = accessiblesToString(rhs.options);
+
+        if (!rhs.defines.empty()) node["defines"] = rhs.defines;
+        if (!rhs.libraries.empty()) node["libraries"] = rhs.libraries;
+        if (!rhs.interfaces.empty()) node["interfaces"] = rhs.interfaces;
         return node;
     }
 
@@ -269,30 +320,28 @@ struct YAML::convert<cpak::BuildTarget> {
         using namespace cpak;
 
         validateTargetSchema(node);
-        rhs.name = node["name"].as<RequiredProperty<std::string>>();
-        rhs.type = node["type"].as<RequiredProperty<TargetType>>();
+        rhs.name = node["name"].as<std::string>();
+        rhs.type = node["type"].as<TargetType>();
 
         // Check for sources if this isn't an interface target.
-        if (*rhs.type != TargetType::Interface) {
+        if (rhs.type != TargetType::Interface) {
             if (!node["sources"])
                 throw YAML::Exception(node.Mark(),
                                       "Target is missing sources.");
-            rhs.sources = node["sources"].as<VectorProperty<std::string>>();
+            rhs.sources = node["sources"].as<cpak::Accessibles<std::string>>();
         }
 
         // Handle optional fields.
         if (node["search"])
-            rhs.search = node["search"].as<OptionalProperty<SearchPaths>>();
+            rhs.search = node["search"].as<SearchPaths>();
         if (node["options"])
-            rhs.options =
-                vectorPropertyFromString(node["options"].as<std::string>());
+            rhs.options = accessiblesFromString(node["options"].as<std::string>());
         if (node["defines"])
-            rhs.defines = node["defines"].as<VectorProperty<std::string>>();
+            rhs.defines = node["defines"].as<cpak::Accessibles<std::string>>();
         if (node["libraries"])
-            rhs.libraries = node["libraries"].as<VectorProperty<std::string>>();
+            rhs.libraries = node["libraries"].as<cpak::Accessibles<std::string>>();
         if (node["interfaces"])
-            rhs.interfaces =
-                node["interfaces"].as<VectorProperty<std::string>>();
+            rhs.interfaces = node["interfaces"].as<cpak::Accessibles<std::string>>();
         return true;
     }
 };

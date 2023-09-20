@@ -182,11 +182,11 @@ cpak::management::cloneDependency(const cpak::Dependency& dependency,
     // TODO: account for version.
     auto logger    = spdlog::get("cpak");
     auto remoteURL = dependency.remote != std::nullopt
-                         ? *dependency.remote->address
+                         ? dependency.remote->address
                          : "https://github.com"s;
 
-    logger->info("Cloning dependency '{}'", dependency.name->c_str());
-    remoteURL += "/"s + *dependency.gpid + "/"s + *dependency.name;
+    logger->info("Cloning dependency '{}'", dependency.name.c_str());
+    remoteURL += "/"s + dependency.gpid + "/"s + dependency.name;
 
     // Check if remote has repo.
     logger->debug("Checking if remote '{}' exists", remoteURL.c_str());
@@ -203,8 +203,8 @@ cpak::management::cloneDependency(const cpak::Dependency& dependency,
     }
 
     const auto version = dependency.versionIsBranch
-        ? dependency.semv->prerelease()
-        : dependency.semv->str();
+        ? dependency.semv.prerelease()
+        : dependency.semv.str();
 
     // Check if version/branch exists.
     logger->debug("Checking if version '{}' exists", version);
@@ -229,7 +229,7 @@ cpak::management::cloneDependency(const cpak::Dependency& dependency,
         return std::make_tuple(std::nullopt,
                                make_error_code(errc::gitCloneFailed));
 
-    logger->info("Cloned dependency '{}'", dependency.name->c_str());
+    logger->info("Cloned dependency '{}'", dependency.name.c_str());
     return internalLoadCPakFile(dependencyPath);
 }
 
@@ -244,8 +244,8 @@ cpak::management::findDependencyPath(
 #endif
 
     const auto project =
-        fmt::format("{}@{}", *dependency.name, dependency.semv->str());
-    configPath = configPath / ".cpak" / *dependency.gpid / project;
+        fmt::format("{}@{}", dependency.name, dependency.semv.str());
+    configPath = configPath / ".cpak" / dependency.gpid / project;
     if (std::filesystem::exists(configPath))
         return std::make_tuple(configPath, make_error_code(errc::success));
 

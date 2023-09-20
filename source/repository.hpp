@@ -1,5 +1,4 @@
 #pragma once
-#include "property.hpp"
 
 
 namespace cpak {
@@ -10,10 +9,10 @@ namespace cpak {
 ///          support other repositories. This struct contains the information
 ///          needed to pull from those other repositories.
 struct Repository {
-    RequiredProperty<std::string> address;
-    OptionalProperty<std::string> username;
-    OptionalProperty<std::string> email;
-    OptionalProperty<std::string> password;
+    std::string address;
+    std::string username;
+    std::string email;
+    std::string password;
 };
 
 

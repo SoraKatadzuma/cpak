@@ -1,5 +1,4 @@
 #pragma once
-#include "property.hpp"
 #include "version.hpp"
 
 namespace cpak {
@@ -9,9 +8,9 @@ namespace cpak {
 /// @details A CPakID is a unique identifier for a CPak package. These are used
 ///          to identify packages and reference their versions.
 struct Identity {
-    RequiredProperty<std::string> name;
-    RequiredProperty<std::string> gpid;
-    RequiredProperty<version> semv;
+    std::string name;
+    std::string gpid;
+    cpak::version semv;
 
     bool isMapped{ false };
     bool versionIsBranch{ false };
@@ -109,32 +108,12 @@ identityFromString(std::string_view cpakid, bool useBranch = false) {
 inline std::string
 identityToString(const Identity& identity) {
     std::ostringstream oss;
-    oss << *identity.gpid << '/' << *identity.name << '@' << *identity.semv;
+    oss << identity.gpid << '/' << identity.name << '@' << identity.semv;
     return oss.str();
 }
 
 
 } // namespace cpak
-
-
-template<>
-struct YAML::convert<cpak::RequiredProperty<cpak::version>> {
-    static Node
-    encode(const cpak::RequiredProperty<cpak::version>& rhs) {
-        Node node;
-        node = *rhs;
-        return node;
-    }
-
-    static bool
-    decode(const Node& node, cpak::RequiredProperty<cpak::version>& rhs) {
-        if (!node.IsScalar())
-            throw YAML::Exception(node.Mark(), "Version must be a string.");
-
-        rhs = cpak::version::parse(node.as<std::string>());
-        return true;
-    }
-};
 
 
 template<>

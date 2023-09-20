@@ -1,5 +1,5 @@
 #pragma once
-#include "../common.hpp"
+#include "../accessible.hpp"
 
 namespace cpak::utilities {
 
@@ -10,14 +10,14 @@ namespace cpak::utilities {
 /// @param  pattern The formatting pattern.
 inline void
 reserveAndAppendFormatted(std::vector<std::string>& into,
-                          const std::vector<std::string>& from,
+                          const cpak::Accessibles<std::string>& from,
                           const char* pattern = "{}") noexcept {
     if (from.empty()) return;
 
     // Reserve space incase we need it.
     into.reserve(into.size() + from.size());
     for (const auto& value : from)
-        into.emplace_back(fmt::format(fmt::runtime(pattern), value));
+        into.emplace_back(fmt::format(fmt::runtime(pattern), value.stored()));
 }
 
 /// @brief  Gets the name of the log file for the given project.

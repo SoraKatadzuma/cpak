@@ -16,10 +16,10 @@ password: $SECRET_PASSWORD
     const auto& yaml       = YAML::Load(yamlStr);
     const auto& repository = yaml.as<cpak::Repository>();
 
-    EXPECT_EQ(*repository.address, "https://gitlab.com");
-    EXPECT_EQ(*repository.username, "johndoe");
-    EXPECT_EQ(*repository.email, "johndoe@gmail.com");
-    EXPECT_EQ(*repository.password, "$SECRET_PASSWORD");
+    EXPECT_EQ(repository.address, "https://gitlab.com");
+    EXPECT_EQ(repository.username, "johndoe");
+    EXPECT_EQ(repository.email, "johndoe@gmail.com");
+    EXPECT_EQ(repository.password, "$SECRET_PASSWORD");
 }
 
 

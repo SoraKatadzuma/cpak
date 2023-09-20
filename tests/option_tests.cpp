@@ -15,9 +15,9 @@ value: 1.0
     const auto& yaml   = YAML::Load(yamlStr);
     const auto& option = yaml.as<cpak::BuildOption>();
 
-    EXPECT_EQ(*option.name, "MY_CUSTOM_OPTION");
-    EXPECT_EQ(*option.desc, "This is a custom option.");
-    EXPECT_EQ(*option.value, "1.0");
+    EXPECT_EQ(option.name, "MY_CUSTOM_OPTION");
+    EXPECT_EQ(option.desc, "This is a custom option.");
+    EXPECT_EQ(option.value, "1.0");
 }
 
 
