@@ -28,8 +28,14 @@ add_subdirectory(source)
 
 # See if we need to build our tests.
 option(CPAK_BUILD_TESTS "Build tests" ${CPAK_TOP_LEVEL})
-if (CPAK_BUILD_TESTS)
+if (CPAK_BUILD_TESTS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     enable_testing()
     include(GoogleTest)
     add_subdirectory(tests)
+endif()
+
+option(CPAK_INSTALL "Install cpak" OFF)
+if (CPAK_INSTALL)
+    include(GNUInstallDirs)
+    install(TARGETS cpak DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
