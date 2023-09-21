@@ -17,6 +17,18 @@ extern DependencyCache dependencyCache;
 extern InterfaceCache interfaceCache;
 
 
+void reserveAndAppendFormatted(std::vector<std::string>& into,
+                               const cpak::Accessibles<std::string>& from,
+                               const char* pattern = "{}") noexcept {
+    if (from.empty()) return;
+
+    // Reserve space incase we need it.
+    into.reserve(into.size() + from.size());
+    for (const auto& value : from)
+        into.emplace_back(fmt::format(fmt::runtime(pattern), value.stored()));
+}
+
+
 std::error_code
 executeInShell(const std::vector<std::string>& arguments) {
     auto logger = spdlog::get("cpak");
@@ -37,29 +49,33 @@ executeInShell(const std::vector<std::string>& arguments) {
 }
 
 
-cpak::Accessibles<std::string>
-operator|=(const cpak::Accessibles<std::string>& lhs,
-           const cpak::Accessibles<std::string>& rhs) noexcept {
-    auto result = lhs;
-    result.insert(result.end(), rhs.begin(), rhs.end());
-    return result;
+void
+copyIfAccessible(      cpak::Accessibles<std::string>& lhs,
+                 const cpak::Accessibles<std::string>& rhs,
+                 const cpak::BuildTarget* target) noexcept {
+    std::copy_if(rhs.begin(), rhs.end(), std::back_inserter(lhs),
+                 [=](const auto& value) {
+                     return value.isPublic() ||
+                            (value.isPrivate() && value.owner() == target);
+                 });
 }
 
 
 void
 copyInterfacePropertiesToTarget(const cpak::BuildTarget& interface,
                                 cpak::BuildTarget& target) noexcept {
+    auto tgtPtr = &target;
     target.name = interface.name;
     target.type = interface.type;
-    target.defines |= interface.defines;
-    target.libraries |= interface.libraries;
-    target.sources |= interface.sources;
-    target.options |= interface.options;
+    copyIfAccessible(target.defines, interface.defines, tgtPtr);
+    copyIfAccessible(target.libraries, interface.libraries, tgtPtr);
+    copyIfAccessible(target.sources, interface.sources, tgtPtr);
+    copyIfAccessible(target.options, interface.options, tgtPtr);
     if (interface.search != std::nullopt) {
         if (target.search == std::nullopt) target.search = cpak::SearchPaths();
-        target.search->include |= interface.search->include;
-        target.search->system |= interface.search->system;
-        target.search->library |= interface.search->library;
+        copyIfAccessible(target.search->include, interface.search->include, tgtPtr);
+        copyIfAccessible(target.search->system, interface.search->system, tgtPtr);
+        copyIfAccessible(target.search->library, interface.search->library, tgtPtr);
     }
 }
 
@@ -110,18 +126,13 @@ gatherCompilationArguments(const cpak::BuildTarget& target) noexcept {
         arguments.emplace_back(std::move(options));
     }
 
-    cpak::utilities::reserveAndAppendFormatted(
-        arguments, target.defines, "-D {}");
-
+    reserveAndAppendFormatted(arguments, target.defines, "-D {}");
     if (target.search != std::nullopt) {
-        cpak::utilities::reserveAndAppendFormatted(
-            arguments, target.search->include, "-I {}");
-        cpak::utilities::reserveAndAppendFormatted(
-            arguments, target.search->system, "-isystem {}");
+        reserveAndAppendFormatted(arguments, target.search->include, "-I {}");
+        reserveAndAppendFormatted(arguments, target.search->system, "-isystem {}");
     }
 
-    cpak::utilities::reserveAndAppendFormatted(
-        arguments, target.libraries, "-l {}");
+    reserveAndAppendFormatted(arguments, target.libraries, "-l {}");
     return arguments;
 }
 
@@ -158,11 +169,9 @@ gatherLinkingArguments(const cpak::CPakFile& cpakfile,
     }
 
     if (target.search != std::nullopt)
-        cpak::utilities::reserveAndAppendFormatted(
-            arguments, target.search->library, "-L {}");
+        reserveAndAppendFormatted(arguments, target.search->library, "-L {}");
 
-    cpak::utilities::reserveAndAppendFormatted(
-        arguments, target.libraries, "-l {}");
+    reserveAndAppendFormatted(arguments, target.libraries, "-l {}");
     return arguments;
 }
 

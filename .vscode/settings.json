@@ -95,5 +95,6 @@
     "editor.formatOnSave": true,
     "C_Cpp.clang_format_sortIncludes": true,
     "C_Cpp.formatting": "clangFormat",
+    "cmake.configureOnOpen": false,
     "cmake.configureOnEdit": false
 }

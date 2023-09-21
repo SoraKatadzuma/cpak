@@ -209,6 +209,14 @@ accessiblesToString(
 }
 
 
+inline void
+assignTargetToAccessibles(Accessibles<std::string>& accessibles,
+                          BuildTarget* target) noexcept {
+    for (auto& accessible : accessibles)
+        accessible.setOwner(target);
+}
+
+
 /// @brief  Converts the given target to a string.
 /// @param  target The target to convert to a string.
 /// @return The string representation of the target.
@@ -324,24 +332,43 @@ struct YAML::convert<cpak::BuildTarget> {
         rhs.type = node["type"].as<TargetType>();
 
         // Check for sources if this isn't an interface target.
+        auto* target = &rhs;
         if (rhs.type != TargetType::Interface) {
             if (!node["sources"])
                 throw YAML::Exception(node.Mark(),
                                       "Target is missing sources.");
             rhs.sources = node["sources"].as<cpak::Accessibles<std::string>>();
+            assignTargetToAccessibles(rhs.sources, target);
         }
 
         // Handle optional fields.
-        if (node["search"])
+        if (node["search"]) {
             rhs.search = node["search"].as<SearchPaths>();
-        if (node["options"])
+            assignTargetToAccessibles(rhs.search->include, target);
+            assignTargetToAccessibles(rhs.search->system, target);
+            assignTargetToAccessibles(rhs.search->library, target);
+        }
+
+        if (node["options"]) {
             rhs.options = accessiblesFromString(node["options"].as<std::string>());
-        if (node["defines"])
+            assignTargetToAccessibles(rhs.options, target);
+        }
+
+        if (node["defines"]) {
             rhs.defines = node["defines"].as<cpak::Accessibles<std::string>>();
-        if (node["libraries"])
+            assignTargetToAccessibles(rhs.defines, target);
+        }
+
+        if (node["libraries"]) {
             rhs.libraries = node["libraries"].as<cpak::Accessibles<std::string>>();
-        if (node["interfaces"])
+            assignTargetToAccessibles(rhs.libraries, target);
+        }
+
+        if (node["interfaces"]) {
             rhs.interfaces = node["interfaces"].as<cpak::Accessibles<std::string>>();
+            assignTargetToAccessibles(rhs.interfaces, target);
+        }
+
         return true;
     }
 };

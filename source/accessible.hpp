@@ -4,6 +4,8 @@
 namespace cpak {
 
 
+class BuildTarget;
+
 enum struct AccessLevel {
     ePublic,
     eProtected,
@@ -63,6 +65,18 @@ public:
         return level_ == AccessLevel::ePrivate;
     }
 
+    const BuildTarget* owner() const noexcept {
+        return owner_;
+    }
+
+    BuildTarget* owner() noexcept {
+        return owner_;
+    }
+
+    void setOwner(BuildTarget* target) noexcept {
+        owner_ = target;
+    }
+
     bool operator==(const Accessible& other) const noexcept {
         return stored_ == other.stored_ &&
                level_  == other.level_;
@@ -73,8 +87,9 @@ public:
     }
 
 private:
-    TStored     stored_;
-    AccessLevel level_;
+    TStored      stored_;
+    BuildTarget* owner_ = nullptr;
+    AccessLevel  level_ = AccessLevel::ePublic;
 };
 
 
