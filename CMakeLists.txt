@@ -9,13 +9,11 @@ endif()
 
 # Build dependencies
 set(ARGPARSE_INSTALL OFF CACHE BOOL "Include an install target" FORCE)
-set(INSTALL_GTEST OFF CACHE BOOL "Enable installation of googletest. (Projects embedding googletest may want to turn this OFF.)" FORCE)
 set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "Enable parse tools" FORCE)
 add_subdirectory(external/argparse)
 add_subdirectory(external/cpp-semver)
 add_subdirectory(external/cpp-subprocess)
 add_subdirectory(external/glob)
-add_subdirectory(external/googletest)
 add_subdirectory(external/spdlog)
 add_subdirectory(external/yaml-cpp)
 
@@ -30,6 +28,9 @@ add_subdirectory(source)
 # See if we need to build our tests.
 option(CPAK_BUILD_TESTS "Build tests" ${CPAK_TOP_LEVEL})
 if (CPAK_BUILD_TESTS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)    
+    add_subdirectory(external/googletest)
+
     enable_testing()
     include(GoogleTest)
     add_subdirectory(tests)

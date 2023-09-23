@@ -225,11 +225,7 @@ initPullCommand() noexcept {
     pullcmd = std::make_shared<ArgumentParser>(
         "pull", "1.0", argparse::default_arguments::help);
 
-    pullcmd->add_description(
-        "Pulls a project from GitHub given a project ID.\n"
-        "A Project ID is in the form User/Project@Version.\n"
-        "The version is optional and defaults to latest.\n"
-        "The version will pull a specific tag or branch.");
+    pullcmd->add_description("Pulls a project from GitHub given a project ID.");
     pullcmd->set_assign_chars("=:");
 
     pullcmd->add_argument("-u", "--update")
@@ -419,6 +415,7 @@ cpak::application::init() noexcept {
     initProgram();
     initBuildCommand();
     initPullCommand();
+    initInstallCommand();
 
     spdlog::register_logger(logger);
     return cpak::make_error_code(errc::success);
