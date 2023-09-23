@@ -42,6 +42,12 @@ struct CPakBuildErrorCategory : public std::error_category {
             return cpak::errc::kGitRemoteVersionNotFoundMessage.data();
         case cpak::errc::gitCloneFailed:
             return cpak::errc::kGitCloneFailedMessage.data();
+        case cpak::errc::noInstallInfo:
+            return cpak::errc::kNoInstallInfoMessage.data();
+        case cpak::errc::installTargetNotFound:
+            return cpak::errc::kInstallTargetNotFoundMessage.data();
+        case cpak::errc::libraryNotFound:
+            return cpak::errc::kLibraryNotFoundMessage.data();
         case cpak::errc::interfaceNotFound:
             return cpak::errc::kInterfaceNotFoundMessage.data();
         case cpak::errc::interfaceNameCollision:

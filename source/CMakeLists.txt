@@ -16,6 +16,7 @@ target_link_libraries(
     PRIVATE argparse::argparse
     PRIVATE semver::semver
     PRIVATE spdlog::spdlog
+    PRIVATE Glob
     PRIVATE stdc++fs
     PRIVATE subprocess
     PRIVATE yaml-cpp

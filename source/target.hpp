@@ -149,31 +149,31 @@ validateTargetSchema(const YAML::Node& node) {
         throw YAML::Exception(node.Mark(),
                               "Target libraries must be a sequence.");
 
-    if (node["options"] && !node["options"].IsScalar())
-        throw YAML::Exception(node.Mark(), "Target options must be a string.");
+    if (node["options"] &&
+       !node["options"].IsScalar() &&
+       !node["options"].IsSequence())
+        throw YAML::Exception(node.Mark(), "Target options must be a string or sequence.");
 }
 
 
 /// @brief  Creates a vector from a string.
+/// @param  level The access level to assign to the vector.
 /// @param  value The string to create the vector from.
 /// @param  delimiter How to split the string into values.
 /// @return The created vector.
 inline Accessibles<std::string>
-accessiblesFromString(std::string_view value,
+accessiblesFromString(AccessLevel level,
+                      std::string_view value,
                       char delimiter = ' ') noexcept {
     // Split the string into vector of strings, then assign.
     Accessibles<std::string> values;
     std::istringstream iss(value.data());
     std::string token;
     while (std::getline(iss, token, delimiter)) {
-        auto split = utilities::splitStringOnce(token);
-        auto level = AccessLevel::ePublic;
-        if (split.first == "!protected")
-            level = AccessLevel::eProtected;
-        else if (split.first == "!private")
-            level = AccessLevel::ePrivate;
-
-        values.push_back(Accessible(split.second, level));
+        values.push_back(Accessible{
+            .stored = token,
+            .level = level,
+        });
     }
 
     return values;
@@ -185,25 +185,11 @@ accessiblesFromString(std::string_view value,
 /// @param  delimiter How to join the values into a string.
 /// @return The created string.
 inline std::string
-accessiblesToString(
-    const Accessibles<std::string>& accessibles,
-          char delimiter = ' ') noexcept {
+accessiblesToString(const Accessibles<std::string>& accessibles,
+                    char delimiter = ' ') noexcept {
     std::ostringstream oss;
-    for (const auto& value : accessibles) {
-        switch (value.level()) {
-        case AccessLevel::ePublic:
-            oss << "!public" << value.stored();
-            break;
-        case AccessLevel::eProtected:
-            oss << "!protected" << value.stored();
-            break;
-        case AccessLevel::ePrivate:
-            oss << "!private" << value.stored();
-            break;
-        }
-
-        oss << value.stored() << delimiter;
-    }
+    for (const auto& value : accessibles)
+        oss << value.stored << delimiter;
 
     return oss.str();
 }
@@ -213,7 +199,7 @@ inline void
 assignTargetToAccessibles(Accessibles<std::string>& accessibles,
                           BuildTarget* target) noexcept {
     for (auto& accessible : accessibles)
-        accessible.setOwner(target);
+        accessible.owner = target;
 }
 
 
@@ -314,8 +300,28 @@ struct YAML::convert<cpak::BuildTarget> {
         if (rhs.search != std::nullopt)
             node["search"] = rhs.search.value();
         
-        if (!rhs.options.empty())
-            node["options"] = accessiblesToString(rhs.options);
+        if (!rhs.options.empty()) {
+            bool isAllSameAccess;
+            auto accessLevel = rhs.options[0].level;
+            for (const auto& option : rhs.options) {
+                if (option.level != accessLevel) {
+                    isAllSameAccess = false;
+                    break;
+                }
+            }
+
+            if (isAllSameAccess) {
+                // TODO: convert to function.
+                const auto tagName =
+                    accessLevel == AccessLevel::eProtected
+                        ? "!protected"
+                        : accessLevel == AccessLevel::ePrivate
+                            ? "!private"
+                            : "!public";
+                node["options"] = accessiblesToString(rhs.options);
+                node.SetTag(tagName);
+            } else node["options"] = rhs.options;
+        }
 
         if (!rhs.defines.empty()) node["defines"] = rhs.defines;
         if (!rhs.libraries.empty()) node["libraries"] = rhs.libraries;
@@ -350,8 +356,22 @@ struct YAML::convert<cpak::BuildTarget> {
         }
 
         if (node["options"]) {
-            rhs.options = accessiblesFromString(node["options"].as<std::string>());
-            assignTargetToAccessibles(rhs.options, target);
+            if (node["options"].IsScalar()) {
+                AccessLevel level;
+                const auto tag = node["options"].Tag();
+                if (tag == "!protected")
+                    level = AccessLevel::eProtected;
+                else if (tag == "!private")
+                    level = AccessLevel::ePrivate;
+                else
+                    level = AccessLevel::ePublic;
+
+                rhs.options = accessiblesFromString(level, node["options"].as<std::string>());
+                assignTargetToAccessibles(rhs.options, target);
+            } else if (node["options"].IsSequence()) {
+                rhs.options = node["options"].as<cpak::Accessibles<std::string>>();
+                assignTargetToAccessibles(rhs.options, target);
+            }
         }
 
         if (node["defines"]) {

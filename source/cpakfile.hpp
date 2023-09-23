@@ -1,5 +1,6 @@
 #pragma once
 #include "dependency.hpp"
+#include "install.hpp"
 #include "project.hpp"
 #include "repository.hpp"
 #include "target.hpp"
@@ -12,6 +13,7 @@ namespace cpak {
 /// @details Contains all the project information for a CPak project. This
 ///          includes the build targets.
 struct CPakFile {
+    std::optional<Install> install;
     std::vector<BuildTarget> targets;
     std::vector<BuildOption> options;
     std::vector<Repository> repositories;
@@ -35,22 +37,75 @@ struct CPakFile {
     /// @brief  Gets the path to the binaries build directory for this project.
     /// @return The path to the binaries build directory for this project.
     inline std::filesystem::path
-    binariesBuildPath() const noexcept {
+    binaryBuildPath() const noexcept {
         return buildPath / "binaries";
     }
 
     /// @brief  Gets the path to the libraries build directory for this project.
     /// @return The path to the libraries build directory for this project.
     inline std::filesystem::path
-    librariesBuildPath() const noexcept {
+    libraryBuildPath() const noexcept {
         return buildPath / "libraries";
     }
 
     /// @brief  Gets the path to the objects build directory for this project.
     /// @return The path to the objects build directory for this project.
     inline std::filesystem::path
-    objectsBuildPath() const noexcept {
+    objectBuildPath() const noexcept {
         return buildPath / "objects";
+    }
+
+    // TODO: extract to application.
+    static std::filesystem::path
+    rootInstallPath() noexcept {
+    #if _WIN32
+        auto installPath = std::filesystem::path(std::getenv("USERPROFILE"));
+    #else
+        auto installPath = std::filesystem::path(std::getenv("HOME"));
+    #endif
+
+        return installPath / ".cpak";
+    }
+
+
+    static std::filesystem::path
+    globalInstallPath() noexcept {
+        return rootInstallPath() / "global";
+    }
+
+
+    static std::filesystem::path
+    localInstallPath() noexcept {
+        return rootInstallPath() / "local";
+    }
+
+    
+    inline std::filesystem::path
+    installPath() const noexcept {
+        if (install == std::nullopt)
+            return localInstallPath();
+
+        return install->global
+            ? globalInstallPath()
+            : localInstallPath();
+    }
+
+
+    inline std::filesystem::path
+    binaryInstallPath() const noexcept {
+        return installPath() / "bin";
+    }
+
+
+    inline std::filesystem::path
+    libraryInstallPath() const noexcept {
+        return installPath() / "lib";
+    }
+
+
+    inline std::filesystem::path
+    includeInstallPath() const noexcept {
+        return installPath() / "include" / project.name;
     }
 };
 
@@ -88,6 +143,10 @@ validateCPakFileSchema(const YAML::Node& node) {
     if (node["dependencies"] && !node["dependencies"].IsSequence())
         throw YAML::Exception(node.Mark(),
                               "CPakFile dependencies must be a sequence.");
+
+    
+    if (node["install"] && !node["install"].IsMap())
+        throw YAML::Exception(node.Mark(), "CPakFile install is not a map.");
 }
 
 
@@ -100,9 +159,6 @@ struct YAML::convert<cpak::CPakFile> {
     encode(const cpak::CPakFile& rhs) {
         Node node;
         node["project"] = rhs.project;
-        for (const auto& target : rhs.targets)
-            node["targets"].push_back(target);
-
         // Optional fields.
         if (!rhs.options.empty())
             for (const auto& option : rhs.options)
@@ -116,6 +172,12 @@ struct YAML::convert<cpak::CPakFile> {
             for (const auto& dependency : rhs.dependencies)
                 node["dependencies"].push_back(dependency);
 
+        for (const auto& target : rhs.targets)
+            node["targets"].push_back(target);
+
+        if (rhs.install != std::nullopt)
+            node["install"] = rhs.install.value();
+
         return node;
     }
 
@@ -124,9 +186,6 @@ struct YAML::convert<cpak::CPakFile> {
         cpak::validateCPakFileSchema(node);
 
         rhs.project = node["project"].as<cpak::ProjectInfo>();
-        for (const auto& target : node["targets"])
-            rhs.targets.push_back(target.as<cpak::BuildTarget>());
-
         // Optional fields.
         if (node["options"])
             for (const auto& option : node["options"])
@@ -139,6 +198,12 @@ struct YAML::convert<cpak::CPakFile> {
         if (node["dependencies"])
             for (const auto& dependency : node["dependencies"])
                 rhs.dependencies.push_back(dependency.as<cpak::Dependency>());
+
+        for (const auto& target : node["targets"])
+            rhs.targets.push_back(target.as<cpak::BuildTarget>());
+
+        if (node["install"])
+            rhs.install = node["install"].as<cpak::Install>();
 
         return true;
     }

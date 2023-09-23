@@ -4,11 +4,17 @@
 
 
 struct ProjectManagerTestFixture : public ::testing::Test {
-    protected:
+protected:
     static void
     SetUpTestCase() {
-        logger_ = spdlog::stdout_color_mt("cpak");
+        logger_ = std::make_shared<spdlog::logger>("cpak");
         logger_->set_level(spdlog::level::debug);
+
+        auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        consoleSink->set_level(spdlog::level::debug);
+        consoleSink->set_pattern("%H:%M:%S %^%-7l%$ [%n]: %v");
+        logger_->sinks().push_back(consoleSink);
+        spdlog::register_logger(logger_);
 
         pathWithGoodCPakFile_ =
             std::filesystem::temp_directory_path() / ".goodcpaktesting";

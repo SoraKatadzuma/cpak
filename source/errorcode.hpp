@@ -1,4 +1,5 @@
 #pragma once
+#include <limits>
 #include <system_error>
 
 
@@ -22,6 +23,9 @@ enum values : std::uint16_t {
     gitRemoteNotFound,
     gitRemoteVersionNotFound,
     gitCloneFailed,
+    noInstallInfo,
+    installTargetNotFound,
+    libraryNotFound,
     interfaceNotFound,
     interfaceNameCollision,
 
@@ -48,6 +52,9 @@ constexpr std::string_view kDependencyNotFoundMessage = "Dependency not found";
 constexpr std::string_view kGitRemoteNotFoundMessage = "Git remote not found";
 constexpr std::string_view kGitRemoteVersionNotFoundMessage = "Git remote version not found";
 constexpr std::string_view kGitCloneFailedMessage = "Git clone failed";
+constexpr std::string_view kNoInstallInfoMessage = "No install info";
+constexpr std::string_view kInstallTargetNotFoundMessage = "Install target not found";
+constexpr std::string_view kLibraryNotFoundMessage = "Library not found";
 constexpr std::string_view kInterfaceNotFoundMessage = "Interface not found";
 constexpr std::string_view kInterfaceNameCollisionMessage = "Interface name collision";
 

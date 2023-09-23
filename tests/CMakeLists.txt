@@ -7,14 +7,17 @@ add_library(
     ${CMAKE_SOURCE_DIR}/source/pipeline.cpp
 )
 
-target_include_directories(cpaktesting PUBLIC ${CMAKE_SOURCE_DIR}/source)
-target_precompile_headers(cpaktesting PUBLIC ${CMAKE_SOURCE_DIR}/source/common.hpp)
+target_include_directories(
+    cpaktesting
+    PUBLIC ${CMAKE_SOURCE_DIR}/source
+)
 
 target_link_libraries(
     cpaktesting
     PUBLIC argparse::argparse
     PUBLIC semver::semver
     PUBLIC spdlog::spdlog
+    PUBLIC Glob
     PUBLIC yaml-cpp
     PUBLIC subprocess
     PUBLIC stdc++fs
@@ -35,12 +38,13 @@ macro(create_test TESTNAME TESTFILE)
 endmacro()
 
 # Create the tests.
-create_test(accessible accessible_tests.cpp)
-create_test(checksum   checksum_tests.cpp)
-create_test(cpakfile   cpakfile_tests.cpp)
-create_test(dependency dependency_tests.cpp)
-create_test(management management_tests.cpp)
-create_test(option     option_tests.cpp)
-create_test(project    project_tests.cpp)
-create_test(repository repository_tests.cpp)
-create_test(target     target_tests.cpp)
+create_test(accessible   accessible_tests.cpp)
+create_test(checksum     checksum_tests.cpp)
+create_test(cpakfile     cpakfile_tests.cpp)
+create_test(dependency   dependency_tests.cpp)
+create_test(installation installation_tests.cpp)
+create_test(management   management_tests.cpp)
+create_test(option       option_tests.cpp)
+create_test(project      project_tests.cpp)
+create_test(repository   repository_tests.cpp)
+create_test(target       target_tests.cpp)

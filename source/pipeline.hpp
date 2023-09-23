@@ -26,5 +26,11 @@ std::error_code
 executeBuild() noexcept;
 
 
+/// @brief  Installs the given project.
+/// @param  cpakfile The project that needs to be installed.
+/// @return The status code for the operation.
+std::error_code
+installProject(const CPakFile& cpakfile) noexcept;
+
 
 } // namespace cpak

@@ -2,35 +2,44 @@
 #include "errorcode.hpp"
 #include "pipeline.hpp"
 #include "utilities/logging.hpp"
+#include "glob/glob.h"
 
 
 namespace fs = std::filesystem;
 
+using namespace cpak;
+
+using std::string;
+using std::string_view;
+using std::vector;
+
 using BuildQueue = std::queue<std::function<std::error_code()>>;
-using DependencyCache = std::unordered_map<std::string, cpak::CPakFile>;
-using InterfaceCache = std::unordered_map<std::string, const cpak::BuildTarget*>;
+using DependencyCache = std::unordered_map<std::string_view, const cpak::CPakFile*>;
+using InterfaceCache = std::unordered_map<std::string_view, const cpak::BuildTarget*>;
+using LibraryCache = std::unordered_map<std::string_view, const cpak::CPakFile*>;
 
 // Referenced from application.cpp
 // Will need to rework how things are shared between compilation units.
 extern BuildQueue buildQueue;
 extern DependencyCache dependencyCache;
 extern InterfaceCache interfaceCache;
+extern LibraryCache libraryCache;
 
 
-void reserveAndAppendFormatted(std::vector<std::string>& into,
-                               const cpak::Accessibles<std::string>& from,
+void reserveAndAppendFormatted(vector<string>& into,
+                               const Accessibles<string>& from,
                                const char* pattern = "{}") noexcept {
     if (from.empty()) return;
 
     // Reserve space incase we need it.
     into.reserve(into.size() + from.size());
     for (const auto& value : from)
-        into.emplace_back(fmt::format(fmt::runtime(pattern), value.stored()));
+        into.emplace_back(fmt::format(fmt::runtime(pattern), value.stored));
 }
 
 
 std::error_code
-executeInShell(const std::vector<std::string>& arguments) {
+executeInShell(const vector<string>& arguments) {
     auto logger = spdlog::get("cpak");
 
     std::ostringstream oss;
@@ -45,25 +54,28 @@ executeInShell(const std::vector<std::string>& arguments) {
     if (output.length > 0) logger->info("{}", output.buf.data());
     if (error.length > 0) logger->error("{}", error.buf.data());
 
-    return cpak::make_error_code((cpak::errc::values)command.retcode());
+    return make_error_code((errc::values)command.retcode());
 }
 
 
 void
-copyIfAccessible(      cpak::Accessibles<std::string>& lhs,
-                 const cpak::Accessibles<std::string>& rhs,
-                 const cpak::BuildTarget* target) noexcept {
-    std::copy_if(rhs.begin(), rhs.end(), std::back_inserter(lhs),
-                 [=](const auto& value) {
-                     return value.isPublic() ||
-                            (value.isPrivate() && value.owner() == target);
-                 });
+copyIfAccessible(Accessibles<string>& lhs,
+           const Accessibles<string>& rhs,
+           const BuildTarget* target) noexcept {
+    std::copy_if(
+        rhs.begin(),
+        rhs.end(),
+        std::back_inserter(lhs),
+        [=](const auto& value) {
+            return value.isPublic() ||
+                (value.isPrivate() && value.owner == target);
+        });
 }
 
 
 void
-copyInterfacePropertiesToTarget(const cpak::BuildTarget& interface,
-                                cpak::BuildTarget& target) noexcept {
+copyInterfacePropertiesToTarget(const BuildTarget& interface,
+                                      BuildTarget& target) noexcept {
     auto tgtPtr = &target;
     target.name = interface.name;
     target.type = interface.type;
@@ -72,7 +84,7 @@ copyInterfacePropertiesToTarget(const cpak::BuildTarget& interface,
     copyIfAccessible(target.sources, interface.sources, tgtPtr);
     copyIfAccessible(target.options, interface.options, tgtPtr);
     if (interface.search != std::nullopt) {
-        if (target.search == std::nullopt) target.search = cpak::SearchPaths();
+        if (target.search == std::nullopt) target.search = SearchPaths();
         copyIfAccessible(target.search->include, interface.search->include, tgtPtr);
         copyIfAccessible(target.search->system, interface.search->system, tgtPtr);
         copyIfAccessible(target.search->library, interface.search->library, tgtPtr);
@@ -80,19 +92,19 @@ copyInterfacePropertiesToTarget(const cpak::BuildTarget& interface,
 }
 
 
-std::tuple<cpak::BuildTarget, std::error_code>
-flattenInterfaceTarget(const std::vector<cpak::BuildTarget>& targets,
-                       const cpak::BuildTarget& interface) noexcept {
-    cpak::BuildTarget target;
+std::tuple<BuildTarget, std::error_code>
+flattenInterfaceTarget(const vector<BuildTarget>& targets,
+                       const BuildTarget& interface) noexcept {
+    BuildTarget target;
     std::error_code status;
     for (const auto& inherited : interface.interfaces) {
-        if (!interfaceCache.contains(inherited.stored())) {
-            status = cpak::make_error_code(cpak::errc::interfaceNotFound);
+        if (!interfaceCache.contains(inherited.stored)) {
+            status = make_error_code(errc::interfaceNotFound);
             return std::make_tuple(target, status);
         }
 
         std::tie(target, status) =
-            flattenInterfaceTarget(targets, *interfaceCache[inherited.stored()]);
+            flattenInterfaceTarget(targets, *interfaceCache[inherited.stored]);
     }
 
     copyInterfacePropertiesToTarget(interface, target);
@@ -100,18 +112,19 @@ flattenInterfaceTarget(const std::vector<cpak::BuildTarget>& targets,
 }
 
 
-inline std::tuple<cpak::BuildTarget, std::error_code>
-constructConsolidatedTarget(const std::vector<cpak::BuildTarget>& targets,
-                            const cpak::BuildTarget& from) noexcept {
+inline std::tuple<BuildTarget, std::error_code>
+constructConsolidatedTarget(const vector<BuildTarget>& targets,
+                            const BuildTarget& from) noexcept {
     return flattenInterfaceTarget(targets, from);
 }
 
 
-std::vector<std::string>
-gatherCompilationArguments(const cpak::BuildTarget& target) noexcept {
-    std::vector<std::string> arguments;
+vector<string>
+gatherCompilationArguments(const BuildTarget& target) noexcept {
+    vector<string> arguments;
 
-    auto size = target.defines.size() + target.libraries.size() +
+    auto size = target.defines.size() +
+                target.libraries.size() +
                 4; // g++, options, source, and output.
 
     if (target.search != std::nullopt)
@@ -121,8 +134,8 @@ gatherCompilationArguments(const cpak::BuildTarget& target) noexcept {
     arguments.reserve(size);
     arguments.emplace_back("g++");
     if (!target.options.empty()) {
-        auto options = cpak::accessiblesToString(target.options);
-        options      = cpak::utilities::trim(std::move(options));
+        auto options = accessiblesToString(target.options);
+        options      = utilities::trim(std::move(options));
         arguments.emplace_back(std::move(options));
     }
 
@@ -137,11 +150,11 @@ gatherCompilationArguments(const cpak::BuildTarget& target) noexcept {
 }
 
 
-std::vector<std::string>
-gatherLinkingArguments(const cpak::CPakFile& cpakfile,
-                       const cpak::BuildTarget& target,
-                       const std::vector<std::string>& objects) noexcept {
-    std::vector<std::string> arguments;
+vector<string>
+gatherLinkingArguments(const CPakFile& cpakfile,
+                       const BuildTarget& target,
+                       const vector<string>& objects) noexcept {
+    vector<string> arguments;
 
     auto size = objects.size() +
                 target.libraries.size() +
@@ -154,8 +167,8 @@ gatherLinkingArguments(const cpak::CPakFile& cpakfile,
     arguments.reserve(size);
     arguments.emplace_back("g++");
 
-    const auto binaryPath    = cpakfile.binariesBuildPath();
-    const auto librariesPath = cpakfile.librariesBuildPath();
+    const auto binaryPath    = cpakfile.binaryBuildPath();
+    const auto librariesPath = cpakfile.libraryBuildPath();
     for (auto& objectPath : objects) arguments.emplace_back(objectPath);
 
     // If we're linking a dependency, we'll automatically add it's binary and
@@ -163,9 +176,9 @@ gatherLinkingArguments(const cpak::CPakFile& cpakfile,
     for (const auto& iter : dependencyCache) {
         const auto& dependency = iter.second;
         arguments.emplace_back(
-            fmt::format("-L {}", dependency.binariesBuildPath().string()));
+            fmt::format("-L {}", dependency->binaryBuildPath().c_str()));
         arguments.emplace_back(
-            fmt::format("-L {}", dependency.librariesBuildPath().string()));
+            fmt::format("-L {}", dependency->libraryBuildPath().c_str()));
     }
 
     if (target.search != std::nullopt)
@@ -177,8 +190,8 @@ gatherLinkingArguments(const cpak::CPakFile& cpakfile,
 
 
 std::error_code
-cpak::queueForBuild(const cpak::CPakFile& cpakfile,
-                    const cpak::BuildTarget& target) noexcept {
+cpak::queueForBuild(const CPakFile& cpakfile,
+                    const BuildTarget& target) noexcept {
     
     auto logger = spdlog::get("cpak");
     if (target.type == TargetType::Interface) {
@@ -189,28 +202,28 @@ cpak::queueForBuild(const cpak::CPakFile& cpakfile,
     logger->info("Found target '{}'", target.name.c_str());
     auto [consolidated, result] =
         constructConsolidatedTarget(cpakfile.targets, target);
-    if (result.value() != cpak::errc::success)
+    if (result.value() != errc::success)
         return result; // Let the caller handle the error.
 
     auto arguments = gatherCompilationArguments(consolidated);
-    auto objects   = std::vector<std::string>();
+    auto objects   = vector<string>();
     objects.reserve(target.sources.size());
 
     for (const auto& source : target.sources) {
-        const auto sourcePath = cpakfile.projectPath / source.stored();
+        const auto sourcePath = cpakfile.projectPath / source.stored;
         const auto objectPath =
-            cpakfile.objectsBuildPath() /
+            cpakfile.objectBuildPath() /
             fmt::format("{}.o", sourcePath.filename().c_str());
 
         logger->debug("Checking if source exists: {}", sourcePath.c_str());
-        if (!std::filesystem::exists(sourcePath))
+        if (!fs::exists(sourcePath))
             return make_error_code(errc::pathDoesNotExist);
 
         // Add regardless of whether it exists or not, we're planning to build
         // it.
         logger->debug("Adding object: {}", objectPath.c_str());
         objects.emplace_back(objectPath.string());
-        if (std::filesystem::exists(objectPath)) {
+        if (fs::exists(objectPath)) {
             const auto sourceTime = fs::last_write_time(sourcePath);
             const auto objectTime = fs::last_write_time(objectPath);
             if (sourceTime < objectTime) continue; // Does not need to be built.
@@ -230,23 +243,23 @@ cpak::queueForBuild(const cpak::CPakFile& cpakfile,
 
     arguments = gatherLinkingArguments(cpakfile, consolidated, objects);
     buildQueue.push([=]() mutable -> std::error_code {
-        std::string outputName;
-        std::filesystem::path outputPath;
+        string outputName;
+        fs::path outputPath;
 
         switch (consolidated.type) {
-        case cpak::TargetType::Executable:
-            outputPath = cpakfile.binariesBuildPath() / consolidated.name;
+        case TargetType::Executable:
+            outputPath = cpakfile.binaryBuildPath() / consolidated.name;
             arguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
             break;
-        case cpak::TargetType::StaticLibrary:
+        case TargetType::StaticLibrary:
             outputName = fmt::format("lib{}.a", consolidated.name);
-            outputPath = cpakfile.binariesBuildPath() / outputName;
+            outputPath = cpakfile.binaryBuildPath() / outputName;
             arguments.emplace_back("-r");
             arguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
             break;
-        case cpak::TargetType::DynamicLibrary:
+        case TargetType::DynamicLibrary:
             outputName = fmt::format("lib{}.so", consolidated.name);
-            outputPath = cpakfile.librariesBuildPath() / outputName;
+            outputPath = cpakfile.libraryBuildPath() / outputName;
             arguments.emplace_back("-shared");
             arguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
             break;
@@ -262,15 +275,14 @@ cpak::queueForBuild(const cpak::CPakFile& cpakfile,
 
 
 std::error_code
-cpak::queueForBuild(const cpak::CPakFile& cpakfile) noexcept {
+cpak::queueForBuild(const CPakFile& cpakfile) noexcept {
     auto logger      = spdlog::get("cpak");
     auto queueStatus = make_error_code(errc::success);
     logger->info("Building project: {}", cpakfile.projectPath.string());
 
-    const auto buildPath     = cpakfile.buildPath;
-    const auto binariesPath  = buildPath / "binaries";
-    const auto librariesPath = buildPath / "libraries";
-    const auto objectsPath   = buildPath / "objects";
+    const auto binariesPath  = cpakfile.binaryBuildPath();
+    const auto librariesPath = cpakfile.libraryBuildPath();
+    const auto objectsPath   = cpakfile.objectBuildPath();
     if (!fs::exists(binariesPath)) fs::create_directories(binariesPath);
     if (!fs::exists(librariesPath)) fs::create_directories(librariesPath);
     if (!fs::exists(objectsPath)) fs::create_directories(objectsPath);
@@ -282,13 +294,13 @@ cpak::queueForBuild(const cpak::CPakFile& cpakfile) noexcept {
             return make_error_code(
                 errc::failure); // Let the caller handle the error.
 
-        queueStatus = queueForBuild(iter->second);
+        queueStatus = cpak::queueForBuild(*iter->second);
         if (queueStatus.value() != errc::success)
             return queueStatus; // Let the caller handle the error.
     }
 
     for (const auto& target : cpakfile.targets) {
-        queueStatus = queueForBuild(cpakfile, target);
+        queueStatus = cpak::queueForBuild(cpakfile, target);
         if (queueStatus.value() != errc::success)
             return queueStatus; // Let the caller handle the error.
     }
@@ -312,4 +324,183 @@ cpak::executeBuild() noexcept {
     }
 
     return make_error_code(errc::success);
+}
+
+
+void
+installTarget(const BuildTarget& target,
+              const CPakFile& cpakfile,
+              const fs::path& binaryInstallPath,
+              const fs::path& libraryInstallPath) noexcept {
+    const auto targetName = target.name.c_str();
+    const auto binaryBuildPath = cpakfile.binaryBuildPath();
+    const auto libraryBuildPath = cpakfile.libraryBuildPath();
+    
+    auto logger = spdlog::get("cpak");
+    logger->info("Installing target '{}'", targetName);
+    if (target.type == TargetType::StaticLibrary) {
+        const auto fileName = fmt::format("lib{}.a", targetName);
+        const auto libPath = libraryBuildPath / fileName;
+        const auto installPath = libraryInstallPath / fileName;
+        fs::copy_file(libPath, installPath);
+        logger->info("Installed archive '{}'", installPath.c_str());
+    }
+
+    if (target.type == TargetType::DynamicLibrary) {
+    #if defined(_WIN32)
+        const auto fileName = fmt::format("{}.dll", targetName);
+    #else
+        const auto fileName = fmt::format("lib{}.so", targetName);
+    #endif
+
+        const auto binPath = binaryBuildPath / fileName;
+        const auto installPath = binaryInstallPath / fileName;
+        fs::copy_file(binPath, installPath);
+        logger->info("Installed dynlib '{}'", installPath.c_str());
+    }
+
+    if (target.type == TargetType::Executable) {
+    #if defined(_WIN32)
+        const auto fileName = fmt::format("{}.exe", targetName);
+    #else
+        const auto fileName = fmt::format("{}", targetName);
+    #endif
+
+        const auto binPath = binaryBuildPath / fileName;
+        const auto installPath = binaryInstallPath / fileName;
+        fs::copy_file(binPath, installPath);
+        logger->info("Installed executable '{}'", installPath.c_str());
+    }
+}
+
+
+std::error_code
+installMultipleTargets(const CPakFile& cpakfile,
+                       const fs::path& binaryInstallPath,
+                       const fs::path& libraryInstallPath) noexcept {
+    // Install the dependency itself.
+    for (const auto& target : cpakfile.install->targets) {
+        const auto iter = std::find_if(
+            cpakfile.targets.begin(),
+            cpakfile.targets.end(),
+            [=](const auto& installTarget) {
+                return target == installTarget.name;
+            });
+
+        if (iter == cpakfile.targets.end())
+            return make_error_code(errc::installTargetNotFound);
+
+        installTarget(*iter, cpakfile, binaryInstallPath, libraryInstallPath);
+    }
+
+    return make_error_code(errc::success);
+}
+
+
+void
+installFiles(FileType type,
+             const vector<fs::path>& files,
+             const fs::path& binaryInstallPath,
+             const fs::path& libraryInstallPath,
+             const fs::path& includeInstallPath) noexcept {
+    auto logger = spdlog::get("cpak");
+    for (const auto& file : files) {
+        switch (type) {
+        case FileType::Header:
+            fs::copy_file(file, includeInstallPath / file.filename());
+            break;
+        case FileType::Archive:
+            fs::copy_file(file, libraryInstallPath / file.filename());
+            break;
+        case FileType::Dynlib:
+        case FileType::Binary:
+            fs::copy_file(file, binaryInstallPath / file.filename());
+            break;
+        }
+
+        logger->info("Installed file '{}'", file.c_str());
+    }
+}
+
+
+std::error_code
+installMultipleFiles(const CPakFile& cpakfile,
+                     const fs::path& binaryInstallPath,
+                     const fs::path& libraryInstallPath,
+                     const fs::path& includeInstallPath) noexcept {
+    for (const auto& target : cpakfile.install->files) {
+        installFiles(
+            target.type,
+            glob::rglob(target.glob),
+            binaryInstallPath,
+            libraryInstallPath,
+            includeInstallPath);
+    }
+
+    return make_error_code(errc::success);
+}
+
+
+std::error_code
+interanlInstallProject(const CPakFile& cpakfile,
+                       const fs::path& binaryInstallPath,
+                       const fs::path& libraryInstallPath,
+                       const fs::path& includeInstallPath) noexcept {
+    if (cpakfile.install == std::nullopt)
+        return make_error_code(errc::noInstallInfo);
+
+    auto logger = spdlog::get("cpak");
+    logger->info("Installing Project '{}'", cpakfile.projectPath.c_str());
+
+    // Install dependencies of the project.
+    for (const auto& nestedDependency : cpakfile.dependencies) {
+        const auto cpakid = identityToString(nestedDependency);
+        const auto iter   = dependencyCache.find(cpakid);
+        if (iter == dependencyCache.end())
+            return make_error_code(errc::failure);
+
+        interanlInstallProject(
+            *iter->second,
+            binaryInstallPath,
+            libraryInstallPath,
+            includeInstallPath);
+    }
+
+    // Install the project itself.
+    auto result = make_error_code(errc::success);
+    result = installMultipleTargets(
+        cpakfile,
+        binaryInstallPath,
+        libraryInstallPath);
+    if (result.value() != errc::success)
+        return result;
+
+    result = installMultipleFiles(
+        cpakfile,
+        binaryInstallPath,
+        libraryInstallPath,
+        includeInstallPath);
+    if (result.value() != errc::success)
+        return result;
+
+    return result;
+}
+
+
+std::error_code
+cpak::installProject(const CPakFile& cpakfile) noexcept {
+    if (cpakfile.install == std::nullopt)
+        return make_error_code(errc::noInstallInfo);
+
+    const auto binaryInstallPath = cpakfile.binaryInstallPath();
+    const auto libraryInstallPath = cpakfile.libraryInstallPath();
+    const auto includeInstallPath = cpakfile.includeInstallPath();
+    if (!fs::exists(binaryInstallPath)) fs::create_directories(binaryInstallPath);
+    if (!fs::exists(libraryInstallPath)) fs::create_directories(libraryInstallPath);
+    if (!fs::exists(includeInstallPath)) fs::create_directories(includeInstallPath);
+    return interanlInstallProject(
+        cpakfile,
+        binaryInstallPath,
+        libraryInstallPath,
+        includeInstallPath);
 }

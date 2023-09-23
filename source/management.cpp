@@ -91,6 +91,15 @@ cpak::management::loadCPakFile(
         logger->error(fmt::format(fmt::fg(fmt::terminal_color::bright_red),
             "Failed to load CPakfile '{}'", cpakfilePath.c_str()));
 
+        // TODO: extract this to function.
+        if (e.mark.pos == -1) {
+            logger->error(fmt::format(fmt::fg(fmt::terminal_color::bright_red),
+                "{}", e.msg));
+            loadStatus = make_error_code(errc::invalidCPakFile);
+            cpakfile   = std::nullopt;
+            goto FINALLY;
+        }
+
         const auto lines = utilities::splitString(cpakfileAsString, "\n");
 
         // Reset and reuse.
@@ -133,6 +142,7 @@ cpak::management::loadCPakFile(
         cpakfile   = std::nullopt;
     }
 
+FINALLY:
     return std::make_tuple(cpakfile, loadStatus);
 }
 
@@ -238,6 +248,7 @@ cpak::management::cloneDependency(const cpak::Dependency& dependency,
 std::tuple<std::filesystem::path, std::error_code>
 cpak::management::findDependencyPath(
     const cpak::Dependency& dependency) noexcept {
+    // TODO: extract homedir + ".cpak" to a function.
 #if _WIN32
     auto configPath = std::filesystem::path(std::getenv("USERPROFILE"));
 #else

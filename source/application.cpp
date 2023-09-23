@@ -1,6 +1,7 @@
 #include "application.hpp"
 
 #include "errorcode.hpp"
+#include "install.hpp"
 #include "management.hpp"
 #include "pipeline.hpp"
 #include "utilities/checksum.hpp"
@@ -25,17 +26,20 @@ using std::string_view;
 using std::vector;
 
 using BuildQueue = std::queue<std::function<std::error_code()>>;
-using DependencyCache = std::unordered_map<std::string, cpak::CPakFile>;
-using InterfaceCache = std::unordered_map<std::string, const cpak::BuildTarget*>;
+using DependencyCache = std::unordered_map<std::string_view, const cpak::CPakFile*>;
+using InterfaceCache = std::unordered_map<std::string_view, const cpak::BuildTarget*>;
+using LibraryCache = std::unordered_map<std::string_view, const cpak::CPakFile*>;
 
 std::shared_ptr<spdlog::logger> logger;
 std::shared_ptr<ArgumentParser> program;
 std::shared_ptr<ArgumentParser> buildcmd;
 std::shared_ptr<ArgumentParser> pullcmd;
+std::shared_ptr<ArgumentParser> installcmd;
 std::shared_ptr<Configuration> config;
 BuildQueue buildQueue;
 DependencyCache dependencyCache;
 InterfaceCache interfaceCache;
+LibraryCache libraryCache;
 bool pulling;
 
 
@@ -98,19 +102,19 @@ interpolateOptions(BuildTarget& target, const vector<BuildOption>& options) {
 
     // TODO: support interpolation of the target type.
     interpolateOptions(target.name, options);
-    for (auto&& val : target.defines) interpolateOptions(val.stored(), options);
-    for (auto&& val : target.interfaces) interpolateOptions(val.stored(), options);
-    for (auto&& val : target.libraries) interpolateOptions(val.stored(), options);
-    for (auto&& val : target.sources) interpolateOptions(val.stored(), options);
-    for (auto&& val : target.options) interpolateOptions(val.stored(), options);
+    for (auto&& val : target.defines) interpolateOptions(val.stored, options);
+    for (auto&& val : target.interfaces) interpolateOptions(val.stored, options);
+    for (auto&& val : target.libraries) interpolateOptions(val.stored, options);
+    for (auto&& val : target.sources) interpolateOptions(val.stored, options);
+    for (auto&& val : target.options) interpolateOptions(val.stored, options);
 
     if (target.search != std::nullopt) {
         for (auto&& val : target.search->include)
-            interpolateOptions(val.stored(), options);
+            interpolateOptions(val.stored, options);
         for (auto&& val : target.search->system)
-            interpolateOptions(val.stored(), options);
+            interpolateOptions(val.stored, options);
         for (auto&& val : target.search->library)
-            interpolateOptions(val.stored(), options);
+            interpolateOptions(val.stored, options);
     }
 }
 
@@ -211,7 +215,7 @@ initBuildCommand() noexcept {
     buildcmd->add_argument("path")
         .help("Path to the project to build")
         .metavar("PATH")
-        .nargs(1);
+        .nargs(argparse::nargs_pattern::optional);
 
     program->add_subparser(*buildcmd);
 }
@@ -251,6 +255,27 @@ initPullCommand() noexcept {
     program->add_subparser(*pullcmd);
 }
 
+void
+initInstallCommand() noexcept {
+    installcmd = std::make_shared<ArgumentParser>(
+        "install", "1.0", argparse::default_arguments::help);
+    
+    installcmd->add_description("Installs a CPak project to the system.");
+    installcmd->set_assign_chars("=:");
+
+    installcmd->add_argument("-g", "--global")
+        .help("Installs the project globally.")
+        .default_value(false)
+        .implicit_value(true);
+
+    installcmd->add_argument("path")
+        .help("Path to the project to install")
+        .metavar("PATH")
+        .nargs(argparse::nargs_pattern::optional);
+
+    program->add_subparser(*installcmd);
+}
+
 std::tuple<std::optional<CPakFile>, std::error_code>
 internalLoadCPakFile(const fs::path& projectPath) noexcept {
     auto loadStatus         = cpak::make_error_code(cpak::errc::success);
@@ -287,7 +312,7 @@ internalLoadDependencies(const CPakFile& cpakfile) noexcept {
         if (result.value() != cpak::errc::success)
             return result; // Let the caller handle the error.
 
-        dependencyCache[cpakid] = optCPakFile.value();
+        dependencyCache[cpakid] = &optCPakFile.value();
         internalLoadDependencies(optCPakFile.value());
     }
 
@@ -298,7 +323,9 @@ internalLoadDependencies(const CPakFile& cpakfile) noexcept {
 std::error_code
 handleBuildCommand() noexcept {
     const auto pathStr     = buildcmd->get("path");
-    const auto projectPath = fs::canonical(pathStr);
+    const auto projectPath = pathStr.empty()
+        ? std::filesystem::current_path()
+        : fs::canonical(pathStr);
 
     auto [optCPakFile, result] = internalLoadCPakFile(projectPath);
     if (result.value() != cpak::errc::success)
@@ -308,7 +335,11 @@ handleBuildCommand() noexcept {
     if (result.value() != cpak::errc::success)
         return result; // Let the caller handle the error.
 
-    return queueForBuild(optCPakFile.value());
+    result = cpak::queueForBuild(optCPakFile.value());
+    if (result.value() != cpak::errc::success)
+        return result; // Let the caller handle the error.
+
+    return cpak::executeBuild();
 }
 
 
@@ -367,6 +398,21 @@ handlePullCommand() noexcept {
 
 
 std::error_code
+handleInstallCommand() noexcept {
+    const auto pathStr     = installcmd->get("path");
+    const auto projectPath = pathStr.empty()
+        ? std::filesystem::current_path()
+        : fs::canonical(pathStr);
+
+    auto [optCPakFile, result] = internalLoadCPakFile(projectPath);
+    if (result.value() != cpak::errc::success)
+        return result; // Let the caller handle the error.
+
+    return cpak::installProject(optCPakFile.value());
+}
+
+
+std::error_code
 cpak::application::init() noexcept {
     initLogger();
     loadConfig();
@@ -399,13 +445,14 @@ cpak::application::run(const vector<string>& arguments) noexcept {
     if (program->is_subcommand_used("build")) {
         commandString = "build";
         commandStatus = handleBuildCommand();
-        if (commandStatus.value() != cpak::errc::success) return commandStatus;
-
-        commandStatus = executeBuild();
         return commandStatus;
     } else if (program->is_subcommand_used("pull")) {
         commandString = "pull";
         commandStatus = handlePullCommand();
+        return commandStatus;
+    } else if (program->is_subcommand_used("install")) {
+        commandString = "install";
+        commandStatus = handleInstallCommand();
         return commandStatus;
     }
 
