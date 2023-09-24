@@ -3,7 +3,7 @@ RELEASE=0
 INSTALL=0
 
 function usage {
-    echo "Usage: $0 [-c] [-r]"
+    echo "Usage: $0 [-c] [-r] [-i] [-h]"
     echo "  -c: Whether to configure the project or just build it."
     echo "  -r: Whether to build a release or debug version of the project."
     echo "  -s: Whether or not to compile the shaders for the project."
