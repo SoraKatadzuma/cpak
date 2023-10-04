@@ -212,6 +212,11 @@ initBuildCommand() noexcept {
         .metavar("OPTION[:value]")
         .append();
 
+    buildcmd->add_argument("-p", "--profile")
+        .help("Sets the build profile")
+        .metavar("PROFILE")
+        .nargs(1);
+
     buildcmd->add_argument("path")
         .help("Path to the project to build")
         .metavar("PATH")
