@@ -1,5 +1,6 @@
 #pragma once
 #include "../common.hpp"
+#include <string>
 
 namespace cpak::utilities {
 
@@ -92,6 +93,24 @@ splitString(std::string_view str,
 
     result.emplace_back(str.substr(previous, current - previous));
     return result;
+}
+
+
+inline std::string
+textWrap(std::string      source,
+         std::size_t      length,
+         std::string_view padding = "") noexcept {
+    std::string::size_type index = 0;
+    do {
+        index = source.find(' ', index + length);
+        if (index == std::string::npos)
+            break;
+        source.at(index) = '\n';
+        if (padding.size() != 0)
+            source.insert(index + 1, padding);
+    } while (true);
+
+    return source;
 }
 
 

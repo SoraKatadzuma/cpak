@@ -120,9 +120,3 @@ tests:
 - project_tests
 - repository_tests
 - target_tests
-
-install:
-  targets:
-  # Assumes 755 permissions.
-  - src: cpak
-    dst: bin

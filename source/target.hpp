@@ -2,6 +2,8 @@
 #include "accessible.hpp"
 #include "option.hpp"
 #include "utilities/stropts.hpp"
+#include <iomanip>
+#include <optional>
 
 namespace cpak {
 
@@ -38,6 +40,7 @@ struct BuildTarget {
     Accessibles<std::string> sources;
     Accessibles<std::string> options;
     std::optional<SearchPaths> search;
+    std::optional<std::string> desc;
 
     std::string name{ "INVALID" };
     TargetType  type{ TargetType::Undefined };
@@ -122,6 +125,9 @@ validateTargetSchema(const YAML::Node& node) {
         throw YAML::Exception(node.Mark(), "Target is missing a type.");
     else if (!node["type"].IsScalar())
         throw YAML::Exception(node.Mark(), "Target type must be a string.");
+
+    if (node["desc"] && !node["desc"].IsScalar())
+        throw YAML::Exception(node.Mark(), "Target description must be a string."); 
 
     // Because the target could be a interface, and interfaces don't require
     // sources, we have to defer the check for absence of sources until after
@@ -237,6 +243,57 @@ to_string(const BuildTarget& target) noexcept {
 }
 
 
+inline std::string
+describe(const BuildTarget& target) noexcept {
+    std::ostringstream oss;
+    oss << "\n" << target.name
+        << " (" << buildTypeName(target.type)
+        << ")\n\n";
+
+    if (target.desc != std::nullopt)
+        oss << "Description:\n  "
+            << utilities::textWrap(target.desc.value(), 50, "  ")
+            << "\n";
+
+    if (target.interfaces.size() != 0) {
+        oss << "Inherits from:\n";
+        for (const auto& interface : target.interfaces)
+            oss << " - " << interface.stored << "\n";
+        oss << std::endl;
+    }
+
+    oss << "Compiled with:\n";
+    if (target.search != std::nullopt) {
+        for (const auto& sysInclude : target.search->system)
+            oss << "-isystem " << sysInclude.stored << "\n";
+
+        for (const auto& regInclude : target.search->include)
+            oss << "-I " << regInclude.stored << "\n";
+
+        for (const auto& libInclude : target.search->library)
+            oss << "-L " << libInclude.stored << "\n";
+    }
+
+    for (const auto& define : target.defines)
+        oss << "-D " << define.stored << "\n";
+
+    if (target.options.size() != 0) {
+        for (const auto& option : target.options)
+            oss << option.stored << " ";
+        oss << "\n";
+    }
+
+    for (const auto& library : target.libraries)
+        oss << "-l " << library.stored << "\n";
+    
+    oss << "-c\n";
+    for (const auto& source : target.sources)
+        oss << "  " << source.stored << "\n";
+
+    return oss.str();
+}
+
+
 } // namespace cpak
 
 
@@ -296,6 +353,9 @@ struct YAML::convert<cpak::BuildTarget> {
         node["type"]    = rhs.type;
         node["sources"] = rhs.sources;
 
+        if (rhs.desc != std::nullopt)
+            node["desc"] = rhs.desc.value();
+
         // Handle optional fields.
         if (rhs.search != std::nullopt)
             node["search"] = rhs.search.value();
@@ -337,6 +397,9 @@ struct YAML::convert<cpak::BuildTarget> {
         rhs.name = node["name"].as<std::string>();
         rhs.type = node["type"].as<TargetType>();
 
+        if (node["desc"])
+            rhs.desc = node["desc"].as<std::string>();
+
         // Check for sources if this isn't an interface target.
         auto* target = &rhs;
         if (rhs.type != TargetType::Interface) {
@@ -366,7 +429,8 @@ struct YAML::convert<cpak::BuildTarget> {
                 else
                     level = AccessLevel::ePublic;
 
-                rhs.options = accessiblesFromString(level, node["options"].as<std::string>());
+                const auto& opts = cpak::utilities::trim(node["options"].as<std::string>());
+                rhs.options = accessiblesFromString(level, opts);
                 assignTargetToAccessibles(rhs.options, target);
             } else if (node["options"].IsSequence()) {
                 rhs.options = node["options"].as<cpak::Accessibles<std::string>>();

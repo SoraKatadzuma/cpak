@@ -1,12 +1,15 @@
 #include "application.hpp"
 
 #include "errorcode.hpp"
+#include "describe.hpp"
 #include "install.hpp"
 #include "management.hpp"
 #include "pipeline.hpp"
+#include "target.hpp"
 #include "utilities/checksum.hpp"
 #include "utilities/logging.hpp"
 #include "utilities/stropts.hpp"
+#include <string>
 
 
 namespace fs   = std::filesystem;
@@ -33,6 +36,7 @@ using LibraryCache = std::unordered_map<std::string_view, const cpak::CPakFile*>
 std::shared_ptr<spdlog::logger> logger;
 std::shared_ptr<ArgumentParser> program;
 std::shared_ptr<ArgumentParser> buildcmd;
+std::shared_ptr<ArgumentParser> describecmd;
 std::shared_ptr<ArgumentParser> pullcmd;
 std::shared_ptr<ArgumentParser> installcmd;
 std::shared_ptr<Configuration> config;
@@ -212,6 +216,11 @@ initBuildCommand() noexcept {
         .metavar("OPTION[:value]")
         .append();
 
+    buildcmd->add_argument("--build-name")
+        .help("Overrides the build hash to use a readable name")
+        .metavar("NAME")
+        .nargs(1);
+
     buildcmd->add_argument("-p", "--profile")
         .help("Sets the build profile")
         .metavar("PROFILE")
@@ -223,6 +232,40 @@ initBuildCommand() noexcept {
         .nargs(argparse::nargs_pattern::optional);
 
     program->add_subparser(*buildcmd);
+}
+
+void
+initDescribeCommand() noexcept {
+    describecmd = std::make_shared<ArgumentParser>(
+        "describe", "1.0", argparse::default_arguments::help);
+
+    describecmd->add_description("Describes the project and its properties");
+    describecmd->set_assign_chars("=:");
+
+    describecmd->add_argument("--no-tui")
+                .help("Disables terminal UI for iostream operations")
+                .default_value(false)
+                .implicit_value(true);
+
+    auto& describeGroup = describecmd->add_mutually_exclusive_group();
+    describeGroup.add_argument("-p", "--properties")
+                 .help("List the properties that you want displayed")
+                 .metavar("PROPERTY")
+                 .action(cpak::stringToDescribeProperties)
+                 .default_value(static_cast<std::uint8_t>(cpak::DescribeProperty::All))
+                 .nargs(argparse::nargs_pattern::at_least_one);
+
+    describeGroup.add_argument("-n", "--name")
+                 .help("Display the property of a given name")
+                 .metavar("NAME")
+                 .nargs(1);
+    
+    describecmd->add_argument("path")
+                .help("The path to the project to describe")
+                .metavar("PATH")
+                .nargs(argparse::nargs_pattern::optional);
+
+    program->add_subparser(*describecmd);
 }
 
 void
@@ -299,8 +342,12 @@ internalLoadCPakFile(const fs::path& projectPath) noexcept {
             interfaceCache[target.name] = &target;
     }
 
+    const auto buildName = buildcmd->is_used("--build-name")
+        ? buildcmd->get<std::string>("--build-name")
+        : util::checksum(*cpakfile);
+
     cpakfile->projectPath = projectPath;
-    cpakfile->buildPath   = projectPath / ".cpak" / util::checksum(*cpakfile);
+    cpakfile->buildPath = projectPath / ".cpak" / buildName;
     return std::make_tuple(cpakfile, result);
 }
 
@@ -323,10 +370,9 @@ internalLoadDependencies(const CPakFile& cpakfile) noexcept {
 
 std::error_code
 handleBuildCommand() noexcept {
-    const auto pathStr     = buildcmd->get("path");
-    const auto projectPath = pathStr.empty()
-        ? std::filesystem::current_path()
-        : fs::canonical(pathStr);
+    const auto projectPath = describecmd->is_used("path")
+        ? fs::canonical(describecmd->get("path"))
+        : std::filesystem::current_path();
 
     auto [optCPakFile, result] = internalLoadCPakFile(projectPath);
     if (result.value() != cpak::errc::success)
@@ -341,6 +387,36 @@ handleBuildCommand() noexcept {
         return result; // Let the caller handle the error.
 
     return cpak::executeBuild();
+}
+
+
+std::error_code
+handleDescribeCommand() noexcept {
+    if (!describecmd->is_used("--no-tui"))
+        logger->warn("Terminal UI is not yet implemented, use \"--no-tui\" to ignore this.");
+
+    const auto projectPath = describecmd->is_used("path")
+        ? fs::canonical(describecmd->get("path"))
+        : std::filesystem::current_path();
+
+    auto [optCPakFile, result] = internalLoadCPakFile(projectPath);
+    if (result.value() != cpak::errc::success)
+        return result;
+
+    if (describecmd->is_used("--properties")) {
+
+    }
+
+    if (describecmd->is_used("--name")) {
+        const auto& name = describecmd->get<std::string>("--name");
+        for (const auto& target : optCPakFile->targets) {
+            if (target.name != name) continue;
+            logger->info("Describing Target...");
+            std::cout << cpak::describe(target) << std::endl;
+        }
+    }
+
+    return cpak::make_error_code(cpak::errc::success);
 }
 
 
@@ -419,6 +495,7 @@ cpak::application::init() noexcept {
     loadConfig();
     initProgram();
     initBuildCommand();
+    initDescribeCommand();
     initPullCommand();
     initInstallCommand();
 
@@ -447,6 +524,10 @@ cpak::application::run(const vector<string>& arguments) noexcept {
     if (program->is_subcommand_used("build")) {
         commandString = "build";
         commandStatus = handleBuildCommand();
+        return commandStatus;
+    } else if (program->is_subcommand_used("describe")) {
+        commandString = "describe";
+        commandStatus = handleDescribeCommand();
         return commandStatus;
     } else if (program->is_subcommand_used("pull")) {
         commandString = "pull";

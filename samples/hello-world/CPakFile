@@ -1,0 +1,14 @@
+project:
+    name: hello-world
+    gpid: SoraKatadzuma
+    semv: 1.0.0
+
+targets:
+- name: hw-sample
+  type: executable
+  desc: >
+    Builds a "Hello, World!" sample project using
+    a CPakFile to show the usage of cpak within an
+    actual project.
+  sources:
+  - ./main.cpp
