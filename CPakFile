@@ -11,6 +11,11 @@ project:
   authors:
   - John Christman dungeonsandanime@gmail.com
 
+options:
+- name: CPAK_BUILD_TESTS
+  desc: "Whether to build the tests for CPak."
+  value: false
+
 # All dependencies are forked to include their own CPakFiles.
 dependencies:
 - SoraKatadzuma/argparse@1.0.0

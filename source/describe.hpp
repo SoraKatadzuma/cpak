@@ -11,23 +11,22 @@ namespace cpak {
 enum struct DescribeProperty : std::uint8_t {
     Options      = 1 << 0,
     Targets      = 1 << 1,
-    Dependencies = 1 << 2,
     All          = 0xFF
 };
 
 
-constexpr std::array<std::string_view, 4> kPropertyNames {
-    "options", "targets", "dependencies", "all"
+constexpr std::array<std::string_view, 3> kPropertyNames {
+    "options", "targets", "all"
 };
 
 
 inline std::string
 describePropertiesToString(std::uint8_t properties) {
     if (properties == static_cast<std::uint8_t>(DescribeProperty::All))
-        return std::string(kPropertyNames[3]);
+        return std::string(kPropertyNames[2]);
 
     std::ostringstream oss;
-    for (auto index = 0u; index < 3; index++) {
+    for (auto index = 0u; index < kPropertyNames.size() - 1; index++) {
         auto positiveProperty = properties & (1 << index);
         if (positiveProperty == 0) continue;
         
@@ -41,12 +40,11 @@ stringToDescribeProperties(std::string_view str) {
     static std::unordered_map<std::string_view, std::uint8_t> kMappedProperties {
         { kPropertyNames[0], static_cast<std::uint8_t>(DescribeProperty::Options)      },
         { kPropertyNames[1], static_cast<std::uint8_t>(DescribeProperty::Targets)      },
-        { kPropertyNames[2], static_cast<std::uint8_t>(DescribeProperty::Dependencies) },
-        { kPropertyNames[3], static_cast<std::uint8_t>(DescribeProperty::All)          }
+        { kPropertyNames[2], static_cast<std::uint8_t>(DescribeProperty::All)          }
     };
 
     const auto& properties = utilities::splitString(str, ",");
-    if (properties.size() == 1 && properties[0] == kPropertyNames[3])
+    if (properties.size() == 1 && properties[0] == kPropertyNames[2])
         return static_cast<std::uint8_t>(DescribeProperty::All);
 
     std::uint8_t result;

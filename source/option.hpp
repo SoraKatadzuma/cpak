@@ -1,5 +1,6 @@
 #pragma once
 #include "common.hpp"
+#include "utilities/stropts.hpp"
 
 namespace cpak {
 
@@ -71,6 +72,18 @@ interpolateOptions(std::string& argument,
 }
 
 
+inline std::string
+describe(const BuildOption& option) noexcept {
+    std::ostringstream oss;
+    oss << "\n" << option.name
+        << ":"  << option.value
+        << " (default)\n";
+    if (option.desc != std::nullopt)
+        oss << option.desc.value() << "\n";
+    return oss.str();
+}
+
+
 } // namespace cpak
 
 
@@ -93,7 +106,7 @@ struct YAML::convert<cpak::BuildOption> {
         rhs.name  = node["name"].as<std::string>();
         rhs.value = node["value"].as<std::string>();
         if (node["desc"])
-            rhs.desc = node["desc"].as<std::string>();
+            rhs.desc = cpak::utilities::trim(node["desc"].as<std::string>());
         return true;
     }
 };

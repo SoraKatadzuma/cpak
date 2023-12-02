@@ -459,6 +459,12 @@ handleDescribeCommand() noexcept {
             logger->info("Describing Target...");
             std::cout << cpak::describe(target) << std::endl;
         }
+
+        for (const auto& option : optCPakFile->options) {
+            if (option.name != name) continue;
+            logger->info("Describing Option...");
+            std::cout << cpak::describe(option) << std::endl;
+        }
     }
 
     return cpak::make_error_code(cpak::errc::success);
