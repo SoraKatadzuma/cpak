@@ -96,6 +96,5 @@
     "C_Cpp.clang_format_sortIncludes": true,
     "C_Cpp.formatting": "clangFormat",
     "cmake.configureOnOpen": false,
-    "cmake.configureOnEdit": false,
-    "C_Cpp.default.compilerPath": "/usr/bin/g++-12"
+    "cmake.configureOnEdit": false
 }

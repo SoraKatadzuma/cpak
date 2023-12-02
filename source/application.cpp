@@ -247,23 +247,36 @@ initDescribeCommand() noexcept {
                 .default_value(false)
                 .implicit_value(true);
 
-    auto& describeGroup = describecmd->add_mutually_exclusive_group();
-    describeGroup.add_argument("-p", "--properties")
+    // TODO: figure out a different way to handle this.
+    describecmd->add_argument("-b", "--branch")
+                .help("Informs CPak that the version is a branch.")
+                .default_value(false)
+                .implicit_value(true);
+
+    auto& selectorGroup = describecmd->add_mutually_exclusive_group();
+    selectorGroup.add_argument("-P", "--properties")
                  .help("List the properties that you want displayed")
                  .metavar("PROPERTY")
                  .action(cpak::stringToDescribeProperties)
                  .default_value(static_cast<std::uint8_t>(cpak::DescribeProperty::All))
                  .nargs(argparse::nargs_pattern::at_least_one);
 
-    describeGroup.add_argument("-n", "--name")
+    selectorGroup.add_argument("-n", "--name")
                  .help("Display the property of a given name")
                  .metavar("NAME")
                  .nargs(1);
+
+    auto& pathOrCPakIDGroup = describecmd->add_mutually_exclusive_group();
+    pathOrCPakIDGroup.add_argument("-c", "--cpakid")
+                     .help("The CPak ID of the project to be described. "
+                           "Will search CPak dependency path for project.")
+                     .metavar("CPAKID")
+                     .nargs(1);
     
-    describecmd->add_argument("path")
-                .help("The path to the project to describe")
-                .metavar("PATH")
-                .nargs(argparse::nargs_pattern::optional);
+    pathOrCPakIDGroup.add_argument("-p", "--path")
+                     .help("The path to the project to be described.")
+                     .metavar("PATH")
+                     .nargs(1);
 
     program->add_subparser(*describecmd);
 }
@@ -392,12 +405,44 @@ handleBuildCommand() noexcept {
 
 std::error_code
 handleDescribeCommand() noexcept {
+    using namespace std::string_literals;
+
     if (!describecmd->is_used("--no-tui"))
         logger->warn("Terminal UI is not yet implemented, use \"--no-tui\" to ignore this.");
 
-    const auto projectPath = describecmd->is_used("path")
-        ? fs::canonical(describecmd->get("path"))
-        : std::filesystem::current_path();
+    fs::path projectPath;
+    if (describecmd->is_used("--cpakid")) {
+        const auto& versionIsBranch = describecmd->get<bool>("--branch");
+        const auto& cpakidStr       = describecmd->get<std::string>("--cpakid");
+        const auto& cpakid          = cpak::identityFromString(cpakidStr, versionIsBranch);
+
+        const auto remote = cpak::Repository{
+            .address  = "https://github.com"s,
+            .username = ""s,
+            .email    = ""s,
+            .password = ""s,
+        };
+
+        // Build dependency manually.
+        auto dependency            = cpak::Dependency{};
+        dependency.name            = cpakid.name;
+        dependency.gpid            = cpakid.gpid;
+        dependency.semv            = cpakid.semv;
+        dependency.remote          = remote;
+        dependency.versionIsBranch = cpakid.versionIsBranch;
+
+        std::error_code findDepResult;
+        std::tie(projectPath, findDepResult) =
+            mgmt::findDependencyPath(dependency);
+
+        // TODO: convert error to represent no such dependency.
+        if (findDepResult.value() != cpak::errc::success)
+            return findDepResult;
+    } else {
+        projectPath = describecmd->is_used("--path")
+            ? fs::canonical(describecmd->get("--path"))
+            : std::filesystem::current_path();
+    }
 
     auto [optCPakFile, result] = internalLoadCPakFile(projectPath);
     if (result.value() != cpak::errc::success)
