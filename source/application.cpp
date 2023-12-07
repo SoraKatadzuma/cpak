@@ -18,7 +18,6 @@ namespace mgmt = cpak::management;
 namespace util = cpak::utilities;
 
 using argparse::ArgumentParser;
-using cpak::Accessible;
 using cpak::BuildOption;
 using cpak::BuildTarget;
 using cpak::Configuration;
@@ -106,25 +105,39 @@ interpolateOptions(BuildTarget& target, const vector<BuildOption>& options) {
 
     // TODO: support interpolation of the target type.
     interpolateOptions(target.name, options);
-    for (auto&& val : target.defines) interpolateOptions(val.stored, options);
-    for (auto&& val : target.interfaces) interpolateOptions(val.stored, options);
-    for (auto&& val : target.libraries) interpolateOptions(val.stored, options);
-    for (auto&& val : target.sources) interpolateOptions(val.stored, options);
-    for (auto&& val : target.options) interpolateOptions(val.stored, options);
+
+    // HACK: assumes that 'value' is what should be operated on but is not
+    //       possible for any properties that are not string!
+    // interpolateOptions(target.type, options);
+    // interpolateOptions(target.enabled, options); // Most importantly!
+
+    for (auto&& val : target.defines) interpolateOptions(val.value, options);
+    for (auto&& val : target.interfaces) interpolateOptions(val.value, options);
+    for (auto&& val : target.libraries) interpolateOptions(val.value, options);
+    for (auto&& val : target.sources) interpolateOptions(val.value, options);
+    for (auto&& val : target.options) interpolateOptions(val.value, options);
 
     if (target.search != std::nullopt) {
         for (auto&& val : target.search->include)
-            interpolateOptions(val.stored, options);
+            interpolateOptions(val.value, options);
         for (auto&& val : target.search->system)
-            interpolateOptions(val.stored, options);
+            interpolateOptions(val.value, options);
         for (auto&& val : target.search->library)
-            interpolateOptions(val.stored, options);
+            interpolateOptions(val.value, options);
     }
 }
 
 
 void
 interpolateOptions(CPakFile& cpakfile) noexcept {
+    static std::vector<BuildOption> cpakPredefines {
+    };
+
+    cpakfile.options.insert(
+        cpakfile.options.end(),
+        cpakPredefines.begin(),
+        cpakPredefines.end());
+
     for (auto& target : cpakfile.targets)
         interpolateOptions(target, cpakfile.options);
 }
@@ -216,10 +229,15 @@ initBuildCommand() noexcept {
         .metavar("OPTION[:value]")
         .append();
 
-    buildcmd->add_argument("--build-name")
-        .help("Overrides the build hash to use a readable name")
-        .metavar("NAME")
-        .nargs(1);
+    auto& outputDirGroup = buildcmd->add_mutually_exclusive_group();
+    outputDirGroup.add_argument("--build-name")
+                  .help("Overrides the build hash to use a readable name")
+                  .metavar("NAME")
+                  .nargs(1);
+    
+    outputDirGroup.add_argument("--root-build")
+                  .help("Overrides the build has to write to root build folder")
+                  .flag();
 
     buildcmd->add_argument("-p", "--profile")
         .help("Sets the build profile")
@@ -273,6 +291,8 @@ initDescribeCommand() noexcept {
                      .metavar("CPAKID")
                      .nargs(1);
     
+    // TODO: Add flag for displaying unevaluated properies.
+    //       This does not apply to options since they merely have default values.
     pathOrCPakIDGroup.add_argument("-p", "--path")
                      .help("The path to the project to be described.")
                      .metavar("PATH")
@@ -341,7 +361,6 @@ internalLoadCPakFile(const fs::path& projectPath) noexcept {
         return { cpakfile, result }; // Let the caller handle the error.
 
     auto command = pulling ? pullcmd : buildcmd;
-
     if (command->is_used("--define"))
         updateOptions(*cpakfile, command->get<vector<string>>("--define"));
 
@@ -355,9 +374,14 @@ internalLoadCPakFile(const fs::path& projectPath) noexcept {
             interfaceCache[target.name] = &target;
     }
 
-    const auto buildName = buildcmd->is_used("--build-name")
-        ? buildcmd->get<std::string>("--build-name")
-        : util::checksum(*cpakfile);
+    const auto buildName = std::invoke([&cpakfile]() {
+        if (buildcmd->is_used("--root-build"))
+            return std::string(".");
+        
+        return buildcmd->is_used("--build-name")
+            ? buildcmd->get<std::string>("--build-name")
+            : util::checksum(*cpakfile);
+    });
 
     cpakfile->projectPath = projectPath;
     cpakfile->buildPath = projectPath / ".cpak" / buildName;
@@ -383,8 +407,8 @@ internalLoadDependencies(const CPakFile& cpakfile) noexcept {
 
 std::error_code
 handleBuildCommand() noexcept {
-    const auto projectPath = describecmd->is_used("path")
-        ? fs::canonical(describecmd->get("path"))
+    const auto projectPath = buildcmd->is_used("path")
+        ? fs::canonical(buildcmd->get("path"))
         : std::filesystem::current_path();
 
     auto [optCPakFile, result] = internalLoadCPakFile(projectPath);
@@ -449,7 +473,7 @@ handleDescribeCommand() noexcept {
         return result;
 
     if (describecmd->is_used("--properties")) {
-
+        // TODO: handle this case.
     }
 
     if (describecmd->is_used("--name")) {
@@ -465,6 +489,8 @@ handleDescribeCommand() noexcept {
             logger->info("Describing Option...");
             std::cout << cpak::describe(option) << std::endl;
         }
+
+        // TODO: handle describing dependencies.
     }
 
     return cpak::make_error_code(cpak::errc::success);

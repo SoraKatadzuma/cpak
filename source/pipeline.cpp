@@ -27,14 +27,14 @@ extern LibraryCache libraryCache;
 
 
 void reserveAndAppendFormatted(vector<string>& into,
-                               const Accessibles<string>& from,
+                               const PropertyList<string>& from,
                                const char* pattern = "{}") noexcept {
     if (from.empty()) return;
 
     // Reserve space incase we need it.
     into.reserve(into.size() + from.size());
     for (const auto& value : from)
-        into.emplace_back(fmt::format(fmt::runtime(pattern), value.stored));
+        into.emplace_back(fmt::format(fmt::runtime(pattern), value.value));
 }
 
 
@@ -59,8 +59,8 @@ executeInShell(const vector<string>& arguments) {
 
 
 void
-copyIfAccessible(Accessibles<string>& lhs,
-           const Accessibles<string>& rhs,
+copyIfAccessible(PropertyList<string>& lhs,
+           const PropertyList<string>& rhs,
            const BuildTarget* target) noexcept {
     std::copy_if(
         rhs.begin(),
@@ -98,13 +98,13 @@ flattenInterfaceTarget(const vector<BuildTarget>& targets,
     BuildTarget target;
     std::error_code status;
     for (const auto& inherited : interface.interfaces) {
-        if (!interfaceCache.contains(inherited.stored)) {
+        if (!interfaceCache.contains(inherited.value)) {
             status = make_error_code(errc::interfaceNotFound);
             return std::make_tuple(target, status);
         }
 
         std::tie(target, status) =
-            flattenInterfaceTarget(targets, *interfaceCache[inherited.stored]);
+            flattenInterfaceTarget(targets, *interfaceCache[inherited.value]);
     }
 
     copyInterfacePropertiesToTarget(interface, target);
@@ -134,7 +134,7 @@ gatherCompilationArguments(const BuildTarget& target) noexcept {
     arguments.reserve(size);
     arguments.emplace_back("g++");
     if (!target.options.empty()) {
-        auto options = accessiblesToString(target.options);
+        auto options = propertiesToString(target.options, ' ', false);
         options      = utilities::trim(std::move(options));
         arguments.emplace_back(std::move(options));
     }
@@ -210,7 +210,7 @@ cpak::queueForBuild(const CPakFile& cpakfile,
     objects.reserve(target.sources.size());
 
     for (const auto& source : target.sources) {
-        const auto sourcePath = cpakfile.projectPath / source.stored;
+        const auto sourcePath = cpakfile.projectPath / source.value;
         const auto objectPath =
             cpakfile.objectBuildPath() /
             fmt::format("{}.o", sourcePath.filename().c_str());
@@ -300,6 +300,8 @@ cpak::queueForBuild(const CPakFile& cpakfile) noexcept {
     }
 
     for (const auto& target : cpakfile.targets) {
+        if (!target.enabled.value) continue;
+
         queueStatus = cpak::queueForBuild(cpakfile, target);
         if (queueStatus.value() != errc::success)
             return queueStatus; // Let the caller handle the error.
