@@ -1,5 +1,5 @@
 #include "application.hpp"
-
+#include "config.hpp"
 #include "errorcode.hpp"
 #include "describe.hpp"
 #include "install.hpp"
@@ -131,6 +131,37 @@ interpolateOptions(BuildTarget& target, const vector<BuildOption>& options) {
 void
 interpolateOptions(CPakFile& cpakfile) noexcept {
     static std::vector<BuildOption> cpakPredefines {
+        cpak::BuildOption{
+            .desc  = "Provides the name of the platform that CPak is being ran on.",
+            .name  = "CPAK_PLATFORM",
+            .value = CPAK_PLATFORM },
+
+    #if CPAK_PLATFORM_LINUX
+        cpak::BuildOption{
+            .desc  = "(shortcut) Whether CPak is running on a Linux platform.",
+            .name  = "CPAK_PLATFORM_LINUX",
+            .value = CPAK_STRINGIZE(CPAK_PLATFORM_LINUX) },
+    #elif CPAK_PLATFORM_WINDOWS
+        cpak::BuildOption{
+            .desc  = "(shortcut) Whether CPak is running on a Windows platform.",
+            .name  = "CPAK_PLATFORM_WINDOWS",
+            .value = CPAK_STRINGIZE(CPAK_PLATFORM_WINDOWS) },
+    #elif CPAK_PLATFORM_MACINTOSH
+        cpak::BuildOption{
+            .desc  = "(shortcut) Whether CPak is running on a Macintosh platform.",
+            .name  = "CPAK_PLATFORM_MACINTOSH",
+            .value = CPAK_STRINGIZE(CPAK_PLATFORM_MACINTOSH) },
+    #endif
+
+        cpak::BuildOption{
+            .desc  = "Path to the source directory of this project.",
+            .name  = "CPAK_SOURCE_DIR",
+            .value = cpakfile.projectPath.c_str() },
+
+        cpak::BuildOption{
+            .desc  = "Path to the build directory of this project.",
+            .name  = "CPAK_BUILD_DIR",
+            .value = cpakfile.buildPath.c_str() },
     };
 
     cpakfile.options.insert(
@@ -361,6 +392,18 @@ internalLoadCPakFile(const fs::path& projectPath) noexcept {
         return { cpakfile, result }; // Let the caller handle the error.
 
     auto command = pulling ? pullcmd : buildcmd;
+    const auto buildName = std::invoke([&cpakfile, &command]() {
+        if (!pulling && command->is_used("--root-build"))
+            return std::string(".");
+        
+        return !pulling && command->is_used("--build-name")
+            ? command->get<std::string>("--build-name")
+            : util::checksum(*cpakfile);
+    });
+
+    cpakfile->projectPath = projectPath;
+    cpakfile->buildPath   = projectPath / ".cpak" / buildName;
+
     if (command->is_used("--define"))
         updateOptions(*cpakfile, command->get<vector<string>>("--define"));
 
@@ -374,17 +417,6 @@ internalLoadCPakFile(const fs::path& projectPath) noexcept {
             interfaceCache[target.name] = &target;
     }
 
-    const auto buildName = std::invoke([&cpakfile]() {
-        if (buildcmd->is_used("--root-build"))
-            return std::string(".");
-        
-        return buildcmd->is_used("--build-name")
-            ? buildcmd->get<std::string>("--build-name")
-            : util::checksum(*cpakfile);
-    });
-
-    cpakfile->projectPath = projectPath;
-    cpakfile->buildPath = projectPath / ".cpak" / buildName;
     return std::make_tuple(cpakfile, result);
 }
 
