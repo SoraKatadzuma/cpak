@@ -13,11 +13,15 @@ namespace cpak {
 /// @details Contains all the project information for a CPak project. This
 ///          includes the build targets.
 struct CPakFile {
-    std::optional<Install> install;
-    std::vector<BuildTarget> targets;
-    std::vector<BuildOption> options;
-    std::vector<Repository> repositories;
-    std::vector<Dependency> dependencies;
+    std::optional<GenericBuildSection> samples;
+    std::optional<GenericBuildSection> tests;
+
+    std::optional<Install>       install;
+    std::vector<InterfaceTarget> interfaces;
+    std::vector<BuildTarget>     targets;
+    std::vector<BuildOption>     options;
+    std::vector<Repository>      repositories;
+    std::vector<Dependency>      dependencies;
 
     ProjectInfo project;
 
@@ -115,7 +119,7 @@ struct CPakFile {
 inline void
 validateCPakFileSchema(const YAML::Node& node) {
     if (!node.IsMap())
-        throw YAML::Exception(node.Mark(), "CPakFile is not a map");
+        throw YAML::Exception(node.Mark(), "CPakFile must be a map.");
 
     if (!node["project"])
         throw YAML::Exception(node.Mark(),
@@ -131,6 +135,17 @@ validateCPakFileSchema(const YAML::Node& node) {
         throw YAML::Exception(node.Mark(),
                               "CPakFile targets must not be empty.");
 
+    if (node["samples"] && !node["samples"].IsMap())
+        throw YAML::Exception(node.Mark(),
+                              "CPakFile samples must be a map.");
+
+    if (node["tests"] && !node["tests"].IsMap())
+        throw YAML::Exception(node.Mark(),
+                              "CPakFile samples must be a map.");
+
+    if (node["interfaces"] && !node["interfaces"].IsSequence())
+        throw YAML::Exception(node.Mark(),
+                              "CPakFile interfaces must be a sequence.");
 
     if (node["options"] && !node["options"].IsSequence())
         throw YAML::Exception(node.Mark(),
@@ -146,7 +161,7 @@ validateCPakFileSchema(const YAML::Node& node) {
 
     
     if (node["install"] && !node["install"].IsMap())
-        throw YAML::Exception(node.Mark(), "CPakFile install is not a map.");
+        throw YAML::Exception(node.Mark(), "CPakFile install must be a map.");
 }
 
 
@@ -199,8 +214,18 @@ struct YAML::convert<cpak::CPakFile> {
             for (const auto& dependency : node["dependencies"])
                 rhs.dependencies.push_back(dependency.as<cpak::Dependency>());
 
+        if (node["interfaces"])
+            for (const auto& interface : node["interfaces"])
+                rhs.interfaces.push_back(interface.as<cpak::InterfaceTarget>());
+
         for (const auto& target : node["targets"])
             rhs.targets.push_back(target.as<cpak::BuildTarget>());
+
+        if (node["samples"])
+            rhs.samples = node["samples"].as<cpak::GenericBuildSection>();
+
+        if (node["tests"])
+            rhs.tests = node["tests"].as<cpak::GenericBuildSection>();
 
         if (node["install"])
             rhs.install = node["install"].as<cpak::Install>();

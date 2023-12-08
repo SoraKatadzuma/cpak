@@ -29,7 +29,7 @@ using std::vector;
 
 using BuildQueue = std::queue<std::function<std::error_code()>>;
 using DependencyCache = std::unordered_map<std::string_view, const cpak::CPakFile*>;
-using InterfaceCache = std::unordered_map<std::string_view, const cpak::BuildTarget*>;
+using InterfaceCache = std::unordered_map<std::string_view, const cpak::InterfaceTarget*>;
 using LibraryCache = std::unordered_map<std::string_view, const cpak::CPakFile*>;
 
 std::shared_ptr<spdlog::logger> logger;
@@ -104,18 +104,18 @@ interpolateOptions(BuildTarget& target, const vector<BuildOption>& options) {
     using cpak::interpolateOptions;
 
     // TODO: support interpolation of the target name.
-    interpolateOptions(target.name, target.name, options);
+    interpolateOptions(target.name.value, target.name.scalar, options);
 
     // HACK: assumes that 'value' is what should be operated on but is not
     //       possible for any properties that are not string!
-    // interpolateOptions(target.type, options);
+    interpolateOptions(target.type.value, target.type.scalar, options);
     interpolateOptions(target.enabled.value, target.enabled.scalar, options);
 
-    for (auto&& val : target.defines)    interpolateOptions(val.value, val.scalar, options);
-    for (auto&& val : target.interfaces) interpolateOptions(val.value, val.scalar, options);
-    for (auto&& val : target.libraries)  interpolateOptions(val.value, val.scalar, options);
-    for (auto&& val : target.sources)    interpolateOptions(val.value, val.scalar, options);
-    for (auto&& val : target.options)    interpolateOptions(val.value, val.scalar, options);
+    for (auto&& val : target.defines)   interpolateOptions(val.value, val.scalar, options);
+    for (auto&& val : target.inherits)  interpolateOptions(val.value, val.scalar, options);
+    for (auto&& val : target.libraries) interpolateOptions(val.value, val.scalar, options);
+    for (auto&& val : target.sources)   interpolateOptions(val.value, val.scalar, options);
+    for (auto&& val : target.options)   interpolateOptions(val.value, val.scalar, options);
 
     if (target.search != std::nullopt) {
         for (auto&& val : target.search->include)
@@ -408,14 +408,16 @@ internalLoadCPakFile(const fs::path& projectPath) noexcept {
         updateOptions(*cpakfile, command->get<vector<string>>("--define"));
 
     interpolateOptions(*cpakfile);
-    for (const auto& target : cpakfile->targets) {
-        if (interfaceCache.contains(target.name))
-            return { cpakfile, cpak::make_error_code(
-                                   cpak::errc::interfaceNameCollision) };
+    for (const auto& interface : cpakfile->interfaces)
+        interfaceCache[interface.name.value] = &interface;
+    // for (const auto& target : cpakfile->targets) {
+    //     if (interfaceCache.contains(target.name.value))
+    //         return { cpakfile, cpak::make_error_code(
+    //                                cpak::errc::interfaceNameCollision) };
 
-        if (target.type == cpak::TargetType::Interface)
-            interfaceCache[target.name] = &target;
-    }
+    //     if (target.type == cpak::TargetType::Interface)
+    //         interfaceCache[target.name] = &target;
+    // }
 
     return std::make_tuple(cpakfile, result);
 }
@@ -511,7 +513,7 @@ handleDescribeCommand() noexcept {
     if (describecmd->is_used("--name")) {
         const auto& name = describecmd->get<std::string>("--name");
         for (const auto& target : optCPakFile->targets) {
-            if (target.name != name) continue;
+            if (target.name.value != name) continue;
             logger->info("Describing Target...");
             std::cout << cpak::describe(target) << std::endl;
         }

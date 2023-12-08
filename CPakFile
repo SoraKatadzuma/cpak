@@ -16,6 +16,10 @@ options:
   desc: "Whether to build the tests for CPak."
   value: false
 
+- name: CPAK_BUILD_SAMPLES
+  desc: "Whether to build the samples for CPak."
+  value: false
+
 # All dependencies are forked to include their own CPakFiles.
 dependencies:
 - SoraKatadzuma/argparse@1.0.0
@@ -25,103 +29,46 @@ dependencies:
 - SoraKatadzuma/spdlog@1.0.0
 - SoraKatadzuma/yaml-cpp@1.0.0
 
+interfaces:
+- name: cpak::testing
+  inherits: [ !private gtest::gtest ]
+  libraries: [ !private cpak::core ]
+
 targets:
-- name: cpaktesting
-  type: static library
-  interfaces:
-  - "argparse::argparse"
-  - "cpp-semver::cpp-semver"
-  - "cpp-subprocess::cpp-subprocess"
-  - "gtest::gtest"
-  - "spdlog::spdlog"
-  - "yaml-cpp::yaml-cpp"
+- name: cpak::core
+  type: archive
+  inherits:
+  - argparse::argparse
+  - semver::semver
+  - subprocess::subprocess
+  - spdlog::spdlog
+  - yamlcpp::yamlcpp
   libraries:
   - stdc++fs
+  options:
+  - "${if:$CPAK_PROFILE == 'Debug'   ? '-g'  : ''}"
+  - "${if:$CPAK_PROFILE == 'Release' ? '-O2' : '-O0'}"
+  - "-Wall -Wextra -Wpedantic -Werror"
   sources:
   - source/application.cpp
   - source/errorcode.cpp
   - source/management.cpp
   - source/pipeline.cpp
-
-- name: checksum_tests
-  type: executable
-  libraries:
-  - cpaktesting
-  sources:
-  - tests/checksum_tests.cpp
-
-- name: cpakfile_tests
-  type: executable
-  libraries:
-  - cpaktesting
-  sources:
-  - tests/cpakfile_tests.cpp
-
-- name: dependency_tests
-  type: executable
-  libraries:
-  - cpaktesting
-  sources:
-  - tests/dependency_tests.cpp
-
-- name: management_tests
-  type: executable
-  libraries:
-  - cpaktesting
-  sources:
-  - tests/management_tests.cpp
-
-- name: option_tests
-  type: executable
-  libraries:
-  - cpaktesting
-  sources:
-  - tests/option_tests.cpp
-
-- name: project_tests
-  type: executable
-  libraries:
-  - cpaktesting
-  sources:
-  - tests/project_tests.cpp
-
-- name: repository_tests
-  type: executable
-  libraries:
-  - cpaktesting
-  sources:
-  - tests/repository_tests.cpp
-
-- name: target_tests
-  type: executable
-  libraries:
-  - cpaktesting
-  sources:
-  - tests/target_tests.cpp
 
 - name: cpak
   type: executable
-  interfaces:
-  - "argparse::argparse"
-  - "cpp-semver::cpp-semver"
-  - "cpp-subprocess::cpp-subprocess"
-  - "spdlog::spdlog"
-  - "yaml-cpp::yaml-cpp"
-  options: >
-    -g -Wall -Wextra -Wpedantic -Werror
-  sources:
-  - source/application.cpp
-  - source/entry.cpp
-  - source/errorcode.cpp
-  - source/management.cpp
-  - source/pipeline.cpp
+  libraries: [ cpak::core ]
+  sources: [ source/entry.cpp ]
 
 tests:
-- checksum_tests
-- cpakfile_tests
-- dependency_tests
-- management_tests
-- option_tests
-- project_tests
-- repository_tests
-- target_tests
+  enabled: "${CPAK_BUILD_TESTS}"
+  inherits: [ cpak::testing ]
+  targets:
+  - tests/checksum_tests.cpp
+  - tests/cpakfile_tests.cpp
+  - tests/dependency_tests.cpp
+  - tests/management_tests.cpp
+  - tests/option_tests.cpp
+  - tests/project_tests.cpp
+  - tests/repository_tests.cpp
+  - tests/target_tests.cpp

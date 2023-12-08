@@ -15,7 +15,7 @@ using std::vector;
 
 using BuildQueue = std::queue<std::function<std::error_code()>>;
 using DependencyCache = std::unordered_map<std::string_view, const cpak::CPakFile*>;
-using InterfaceCache = std::unordered_map<std::string_view, const cpak::BuildTarget*>;
+using InterfaceCache = std::unordered_map<std::string_view, const cpak::InterfaceTarget*>;
 using LibraryCache = std::unordered_map<std::string_view, const cpak::CPakFile*>;
 
 // Referenced from application.cpp
@@ -74,11 +74,10 @@ copyIfAccessible(PropertyList<string>& lhs,
 
 
 void
-copyInterfacePropertiesToTarget(const BuildTarget& interface,
-                                      BuildTarget& target) noexcept {
+copyInterfacePropertiesToTarget(const InterfaceTarget& interface,
+                                      BuildTarget&     target) noexcept {
     auto tgtPtr = &target;
     target.name = interface.name;
-    target.type = interface.type;
     copyIfAccessible(target.defines, interface.defines, tgtPtr);
     copyIfAccessible(target.libraries, interface.libraries, tgtPtr);
     copyIfAccessible(target.sources, interface.sources, tgtPtr);
@@ -94,10 +93,10 @@ copyInterfacePropertiesToTarget(const BuildTarget& interface,
 
 std::tuple<BuildTarget, std::error_code>
 flattenInterfaceTarget(const vector<BuildTarget>& targets,
-                       const BuildTarget& interface) noexcept {
+                       const InterfaceTarget& interface) noexcept {
     BuildTarget target;
     std::error_code status;
-    for (const auto& inherited : interface.interfaces) {
+    for (const auto& inherited : interface.inherits) {
         if (!interfaceCache.contains(inherited.value)) {
             status = make_error_code(errc::interfaceNotFound);
             return std::make_tuple(target, status);
@@ -114,7 +113,7 @@ flattenInterfaceTarget(const vector<BuildTarget>& targets,
 
 inline std::tuple<BuildTarget, std::error_code>
 constructConsolidatedTarget(const vector<BuildTarget>& targets,
-                            const BuildTarget& from) noexcept {
+                            const InterfaceTarget& from) noexcept {
     return flattenInterfaceTarget(targets, from);
 }
 
@@ -192,16 +191,13 @@ gatherLinkingArguments(const CPakFile& cpakfile,
 std::error_code
 cpak::queueForBuild(const CPakFile& cpakfile,
                     const BuildTarget& target) noexcept {
-    
     auto logger = spdlog::get("cpak");
-    if (target.type == TargetType::Interface) {
-        logger->info("Skipping interface target: {}", target.name.c_str());
-        return make_error_code(errc::success);
-    }
-
-    logger->info("Found target '{}'", target.name.c_str());
+    logger->info("Found target '{}'", target.name.value.c_str());
     auto [consolidated, result] =
         constructConsolidatedTarget(cpakfile.targets, target);
+
+    // Interfaces don't share this anymore, so we need to copy it afterwards.
+    consolidated.type = target.type;
     if (result.value() != errc::success)
         return result; // Let the caller handle the error.
 
@@ -246,19 +242,21 @@ cpak::queueForBuild(const CPakFile& cpakfile,
         string outputName;
         fs::path outputPath;
 
-        switch (consolidated.type) {
+        logger->debug("target type: {}", buildTypeName(consolidated.type.value));
+
+        switch (consolidated.type.value) {
         case TargetType::Executable:
-            outputPath = cpakfile.binaryBuildPath() / consolidated.name;
+            outputPath = cpakfile.binaryBuildPath() / consolidated.name.value;
             arguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
             break;
         case TargetType::StaticLibrary:
-            outputName = fmt::format("lib{}.a", consolidated.name);
+            outputName = fmt::format("lib{}.a", consolidated.name.value);
             outputPath = cpakfile.binaryBuildPath() / outputName;
             arguments.emplace_back("-r");
             arguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
             break;
         case TargetType::DynamicLibrary:
-            outputName = fmt::format("lib{}.so", consolidated.name);
+            outputName = fmt::format("lib{}.so", consolidated.name.value);
             outputPath = cpakfile.libraryBuildPath() / outputName;
             arguments.emplace_back("-shared");
             arguments.emplace_back(fmt::format("-o {}", outputPath.c_str()));
@@ -269,7 +267,7 @@ cpak::queueForBuild(const CPakFile& cpakfile,
         return executeInShell(arguments);
     });
 
-    logger->debug("Queued for Linking: {}", target.name.c_str());
+    logger->debug("Queued for Linking: {}", target.name.value.c_str());
     return result;
 }
 
@@ -334,13 +332,13 @@ installTarget(const BuildTarget& target,
               const CPakFile& cpakfile,
               const fs::path& binaryInstallPath,
               const fs::path& libraryInstallPath) noexcept {
-    const auto targetName = target.name.c_str();
+    const auto targetName = target.name.value.c_str();
     const auto binaryBuildPath = cpakfile.binaryBuildPath();
     const auto libraryBuildPath = cpakfile.libraryBuildPath();
     
     auto logger = spdlog::get("cpak");
     logger->info("Installing target '{}'", targetName);
-    if (target.type == TargetType::StaticLibrary) {
+    if (target.type.value == TargetType::StaticLibrary) {
         const auto fileName = fmt::format("lib{}.a", targetName);
         const auto libPath = libraryBuildPath / fileName;
         const auto installPath = libraryInstallPath / fileName;
@@ -348,7 +346,7 @@ installTarget(const BuildTarget& target,
         logger->info("Installed archive '{}'", installPath.c_str());
     }
 
-    if (target.type == TargetType::DynamicLibrary) {
+    if (target.type.value == TargetType::DynamicLibrary) {
     #if defined(_WIN32)
         const auto fileName = fmt::format("{}.dll", targetName);
     #else
@@ -361,7 +359,7 @@ installTarget(const BuildTarget& target,
         logger->info("Installed dynlib '{}'", installPath.c_str());
     }
 
-    if (target.type == TargetType::Executable) {
+    if (target.type.value == TargetType::Executable) {
     #if defined(_WIN32)
         const auto fileName = fmt::format("{}.exe", targetName);
     #else
@@ -386,7 +384,7 @@ installMultipleTargets(const CPakFile& cpakfile,
             cpakfile.targets.begin(),
             cpakfile.targets.end(),
             [=](const auto& installTarget) {
-                return target == installTarget.name;
+                return target == installTarget.name.value;
             });
 
         if (iter == cpakfile.targets.end())
