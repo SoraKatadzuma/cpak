@@ -52,23 +52,64 @@ validateBuildOptionSchema(const YAML::Node& node) {
 /// @param argument The argument to interpolate with the options.
 /// @param options The options to interpolate with.
 inline void
-interpolateOptions(std::string& argument,
-                   const std::vector<BuildOption>& options) noexcept {
+interpolateOptions(std::string& evaluated,
+                   const std::string& unevaluated,
+                   const std::vector<BuildOption>& options) {
     // Looking to match ${OPTION_NAME}.
     static std::regex optionRegex("\\$\\{([A-Z_]+)\\}");
 
+    evaluated = unevaluated;
+
     // Match all the options in the argument.
-    std::smatch match;
-    while (std::regex_search(argument, match, optionRegex)) {
+    auto match        = std::smatch{};
+    auto lastPosition = std::smatch::size_type{0};
+    while (std::regex_search(
+        unevaluated.begin() + lastPosition,
+        unevaluated.end(),
+        match,
+        optionRegex))
+    {
+        // this function is on life support
+        // it really needs to be rewritten
         const auto& option = std::find_if(
             options.begin(), options.end(), [&match](const auto& option) {
                 return option.name == match[1].str();
             });
 
-        if (option == options.end()) continue;
+        if (match.position() >= evaluated.length())
+            break;
 
-        argument.replace(match.position(), match.length(), option->value);
+        if (option != options.end())
+            evaluated.replace(match.position(), match.length(), option->value);
+
+        lastPosition += match.length();
+        if (lastPosition == match.position())
+            break;
     }
+}
+
+
+inline void
+interpolateOptions(bool& outEvaluated,
+                   const std::string& unevaluated,
+                   const std::vector<BuildOption>& options) {
+    auto toEvaluate = unevaluated;
+    auto position   = std::string::size_type{0};
+    while ((position = toEvaluate.rfind("${", 0)) != std::string::npos)
+        interpolateOptions(toEvaluate, toEvaluate, options);
+
+    if (toEvaluate == "true" || toEvaluate == "1") {
+        outEvaluated = true;
+        return;
+    }
+    
+    if (toEvaluate == "false" || toEvaluate == "0") {
+        outEvaluated = false;
+        return;
+    }
+
+    // TODO: throw better exception.
+    throw std::runtime_error("Could not evaluate to boolean.");
 }
 
 

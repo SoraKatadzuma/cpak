@@ -334,6 +334,11 @@ describe(const BuildTarget& target) noexcept {
         << " (" << buildTypeName(target.type)
         << ")\n\n";
 
+    oss << "Enabled: "
+        << std::boolalpha
+        << target.enabled.value
+        << "\n";
+    
     if (target.desc != std::nullopt)
         oss << "Description:\n  "
             << utilities::textWrap(target.desc.value(), 50, "  ")

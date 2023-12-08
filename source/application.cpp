@@ -103,27 +103,27 @@ void
 interpolateOptions(BuildTarget& target, const vector<BuildOption>& options) {
     using cpak::interpolateOptions;
 
-    // TODO: support interpolation of the target type.
-    interpolateOptions(target.name, options);
+    // TODO: support interpolation of the target name.
+    interpolateOptions(target.name, target.name, options);
 
     // HACK: assumes that 'value' is what should be operated on but is not
     //       possible for any properties that are not string!
     // interpolateOptions(target.type, options);
-    // interpolateOptions(target.enabled, options); // Most importantly!
+    interpolateOptions(target.enabled.value, target.enabled.scalar, options);
 
-    for (auto&& val : target.defines) interpolateOptions(val.value, options);
-    for (auto&& val : target.interfaces) interpolateOptions(val.value, options);
-    for (auto&& val : target.libraries) interpolateOptions(val.value, options);
-    for (auto&& val : target.sources) interpolateOptions(val.value, options);
-    for (auto&& val : target.options) interpolateOptions(val.value, options);
+    for (auto&& val : target.defines)    interpolateOptions(val.value, val.scalar, options);
+    for (auto&& val : target.interfaces) interpolateOptions(val.value, val.scalar, options);
+    for (auto&& val : target.libraries)  interpolateOptions(val.value, val.scalar, options);
+    for (auto&& val : target.sources)    interpolateOptions(val.value, val.scalar, options);
+    for (auto&& val : target.options)    interpolateOptions(val.value, val.scalar, options);
 
     if (target.search != std::nullopt) {
         for (auto&& val : target.search->include)
-            interpolateOptions(val.value, options);
+            interpolateOptions(val.value, val.scalar, options);
         for (auto&& val : target.search->system)
-            interpolateOptions(val.value, options);
+            interpolateOptions(val.value, val.scalar, options);
         for (auto&& val : target.search->library)
-            interpolateOptions(val.value, options);
+            interpolateOptions(val.value, val.scalar, options);
     }
 }
 
@@ -155,12 +155,12 @@ interpolateOptions(CPakFile& cpakfile) noexcept {
 
         cpak::BuildOption{
             .desc  = "Path to the source directory of this project.",
-            .name  = "CPAK_SOURCE_DIR",
+            .name  = "PROJECT_SOURCE_DIR",
             .value = cpakfile.projectPath.c_str() },
 
         cpak::BuildOption{
             .desc  = "Path to the build directory of this project.",
-            .name  = "CPAK_BUILD_DIR",
+            .name  = "PROJECT_BUILD_DIR",
             .value = cpakfile.buildPath.c_str() },
     };
 
